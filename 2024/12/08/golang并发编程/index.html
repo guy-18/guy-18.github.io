@@ -27,7 +27,7 @@
 <meta property="og:description" content="goroutine的使用在Go语言编程中你不需要去自己写进程、线程、协程，你的技能包里只有一个技能–goroutine，当你需要让某个任务并发执行的时候，你只需要把这个任务包装成一个函数，开启一个goroutine去执行这个函数就可以了，就是这么简单粗暴。Go语言中使用goroutine非常简单，只需要在调用函数的时候在前面加上go关键字，就可以为一个函数创建一个goroutine。一个gorou">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2024-12-08T14:09:17.000Z">
-<meta property="article:modified_time" content="2024-12-08T14:21:41.357Z">
+<meta property="article:modified_time" content="2024-12-08T14:23:35.573Z">
 <meta property="article:author" content="John">
 <meta name="twitter:card" content="summary_large_image">
   
@@ -275,14 +275,14 @@
             
               <div class="markdown-body">
                 
-                <h4 id="goroutine的使用"><a href="#goroutine的使用" class="headerlink" title="goroutine的使用"></a>goroutine的使用</h4><p>在Go语言编程中你不需要去自己写进程、线程、协程，你的技能包里只有一个技能–goroutine，当你需要让某个任务并发执行的时候，你只需要把这个任务包装成一个函数，开启一个goroutine去执行这个函数就可以了，就是这么简单粗暴。<br>Go语言中使用goroutine非常简单，只需要在调用函数的时候在前面加上go关键字，就可以为一个函数创建一个goroutine。<br>一个goroutine必定对应一个函数，可以创建多个goroutine去执行相同的函数。</p>
+                <h2 id="goroutine的使用"><a href="#goroutine的使用" class="headerlink" title="goroutine的使用"></a>goroutine的使用</h2><p>在Go语言编程中你不需要去自己写进程、线程、协程，你的技能包里只有一个技能–goroutine，当你需要让某个任务并发执行的时候，你只需要把这个任务包装成一个函数，开启一个goroutine去执行这个函数就可以了，就是这么简单粗暴。<br>Go语言中使用goroutine非常简单，只需要在调用函数的时候在前面加上go关键字，就可以为一个函数创建一个goroutine。<br>一个goroutine必定对应一个函数，可以创建多个goroutine去执行相同的函数。</p>
 <figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">hello</span><span class="hljs-params">()</span></span> &#123;<br>    fmt.Println(<span class="hljs-string">&quot;Hello Goroutine!&quot;</span>)<br>&#125;<br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">main</span><span class="hljs-params">()</span></span> &#123;<br>    <span class="hljs-keyword">go</span> hello() <span class="hljs-comment">// 启动另外一个goroutine去执行hello函数</span><br>    fmt.Println(<span class="hljs-string">&quot;main goroutine done!&quot;</span>)<br>&#125;<br></code></pre></td></tr></table></figure>
 
-<h4 id="启动多个goroutine"><a href="#启动多个goroutine" class="headerlink" title="启动多个goroutine"></a>启动多个goroutine</h4><p>在Go语言中实现并发就是这样简单，我们还可以启动多个goroutine。让我们再来一个例子： （这里使用了sync.WaitGroup来实现goroutine的同步）</p>
+<h2 id="启动多个goroutine"><a href="#启动多个goroutine" class="headerlink" title="启动多个goroutine"></a>启动多个goroutine</h2><p>在Go语言中实现并发就是这样简单，我们还可以启动多个goroutine。让我们再来一个例子： （这里使用了sync.WaitGroup来实现goroutine的同步）</p>
 <figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-keyword">var</span> wg sync.WaitGroup<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">hello</span><span class="hljs-params">(i <span class="hljs-type">int</span>)</span></span> &#123;<br>    <span class="hljs-keyword">defer</span> wg.Done() <span class="hljs-comment">// goroutine结束就登记-1</span><br>    fmt.Println(<span class="hljs-string">&quot;Hello Goroutine!&quot;</span>, i)<br>&#125;<br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">main</span><span class="hljs-params">()</span></span> &#123;<br><br>    <span class="hljs-keyword">for</span> i := <span class="hljs-number">0</span>; i &lt; <span class="hljs-number">10</span>; i++ &#123;<br>        wg.Add(<span class="hljs-number">1</span>) <span class="hljs-comment">// 启动一个goroutine就登记+1</span><br>        <span class="hljs-keyword">go</span> hello(i)<br>    &#125;<br>    wg.Wait() <span class="hljs-comment">// 等待所有登记的goroutine都结束</span><br>&#125;<br></code></pre></td></tr></table></figure>
 
 <p>多次执行上面的代码，会发现每次打印的数字的顺序都不一致。这是因为10个goroutine是并发执行的，而goroutine的调度是随机的。</p>
-<h4 id="注意退出"><a href="#注意退出" class="headerlink" title="注意退出"></a>注意退出</h4><p>当main()函数返回的时候该goroutine就结束了，所有在main()函数中启动的goroutine会一同结束，main函数所在的goroutine就像是权利的游戏中的夜王，其他的goroutine都是异鬼，夜王一死它转化的那些异鬼也就全部GG了。</p>
+<h2 id="注意退出"><a href="#注意退出" class="headerlink" title="注意退出"></a>注意退出</h2><p>当main()函数返回的时候该goroutine就结束了，所有在main()函数中启动的goroutine会一同结束，main函数所在的goroutine就像是权利的游戏中的夜王，其他的goroutine都是异鬼，夜王一死它转化的那些异鬼也就全部GG了。</p>
 
                 
               </div>
