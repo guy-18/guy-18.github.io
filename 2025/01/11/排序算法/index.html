@@ -19,15 +19,18 @@
   <meta name="author" content="John">
   <meta name="keywords" content="">
   
-    <meta property="og:type" content="article">
+    <meta name="description" content="冒泡排序算法步骤 比较相邻的元素。如果第一个比第二个大，就交换他们两个。 对每一对相邻元素作同样的工作，从开始第一对到结尾的最后一对。这步做完后，最后的元素会是最大的数。 针对所有的元素重复以上的步骤，除了最后一个。 持续每次对越来越少的元素重复上面的步骤，直到没有任何一对数字需要比较。  1234567891011121314151617181920212223242526package ma">
+<meta property="og:type" content="article">
 <meta property="og:title" content="排序算法">
 <meta property="og:url" content="http://guy-18.github.io/2025/01/11/%E6%8E%92%E5%BA%8F%E7%AE%97%E6%B3%95/index.html">
 <meta property="og:site_name" content="John的博客">
+<meta property="og:description" content="冒泡排序算法步骤 比较相邻的元素。如果第一个比第二个大，就交换他们两个。 对每一对相邻元素作同样的工作，从开始第一对到结尾的最后一对。这步做完后，最后的元素会是最大的数。 针对所有的元素重复以上的步骤，除了最后一个。 持续每次对越来越少的元素重复上面的步骤，直到没有任何一对数字需要比较。  1234567891011121314151617181920212223242526package ma">
 <meta property="og:locale" content="zh_CN">
 <meta property="og:image" content="http://guy-18.github.io/2025/01/11/%E6%8E%92%E5%BA%8F%E7%AE%97%E6%B3%95/1.jpg">
 <meta property="og:image" content="http://guy-18.github.io/2025/01/11/%E6%8E%92%E5%BA%8F%E7%AE%97%E6%B3%95/2.webp">
+<meta property="og:image" content="http://guy-18.github.io/2025/01/11/%E6%8E%92%E5%BA%8F%E7%AE%97%E6%B3%95/quick_sort_partition_animation.gif">
 <meta property="article:published_time" content="2025-01-11T13:29:04.000Z">
-<meta property="article:modified_time" content="2025-01-11T13:43:37.773Z">
+<meta property="article:modified_time" content="2025-01-11T15:26:05.778Z">
 <meta property="article:author" content="John">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="http://guy-18.github.io/2025/01/11/%E6%8E%92%E5%BA%8F%E7%AE%97%E6%B3%95/1.jpg">
@@ -223,7 +226,7 @@
       <span class="post-meta mr-2">
         <i class="iconfont icon-chart"></i>
         
-          0 字
+          558 字
         
       </span>
     
@@ -234,7 +237,7 @@
         
         
         
-          1 分钟
+          5 分钟
         
       </span>
     
@@ -277,7 +280,26 @@
               <div class="markdown-body">
                 
                 <p><img src="/2025/01/11/%E6%8E%92%E5%BA%8F%E7%AE%97%E6%B3%95/1.jpg" srcset="/img/loading.gif" lazyload alt="排序算法"></p>
+<h2 id="冒泡排序"><a href="#冒泡排序" class="headerlink" title="冒泡排序"></a>冒泡排序</h2><h3 id="算法步骤"><a href="#算法步骤" class="headerlink" title="算法步骤"></a>算法步骤</h3><ol>
+<li>比较相邻的元素。如果第一个比第二个大，就交换他们两个。</li>
+<li>对每一对相邻元素作同样的工作，从开始第一对到结尾的最后一对。这步做完后，最后的元素会是最大的数。</li>
+<li>针对所有的元素重复以上的步骤，除了最后一个。</li>
+<li>持续每次对越来越少的元素重复上面的步骤，直到没有任何一对数字需要比较。</li>
+</ol>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-keyword">package</span> main<br><span class="hljs-keyword">import</span> <span class="hljs-string">&quot;fmt&quot;</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">bubbleSort</span><span class="hljs-params">(nums []<span class="hljs-type">int</span>)</span></span> []<span class="hljs-type">int</span> &#123;<br>    <span class="hljs-keyword">if</span> <span class="hljs-built_in">len</span>(nums) &lt;= <span class="hljs-number">1</span> &#123;<br>        <span class="hljs-keyword">return</span> nums<br>    &#125;<br>    <span class="hljs-comment">// 冒泡排序核心实现代码</span><br>    <span class="hljs-keyword">for</span> i := <span class="hljs-number">0</span>; i &lt; <span class="hljs-built_in">len</span>(nums); i++ &#123;<br>        flag := <span class="hljs-literal">false</span><br>        <span class="hljs-keyword">for</span> j := <span class="hljs-number">0</span>; j &lt; <span class="hljs-built_in">len</span>(nums) - i - <span class="hljs-number">1</span>; j++ &#123;<br>            <span class="hljs-keyword">if</span> nums[j] &gt; nums[j+<span class="hljs-number">1</span>] &#123;<br>                nums[j], nums[j+<span class="hljs-number">1</span>] = nums[j+<span class="hljs-number">1</span>], nums[j]<br>                flag = <span class="hljs-literal">true</span><br>            &#125;<br>        &#125;<br>        <span class="hljs-keyword">if</span> !flag &#123;<br>            <span class="hljs-keyword">break</span><br>        &#125;<br>    &#125;<br>    <span class="hljs-keyword">return</span> nums<br>&#125;<br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">main</span><span class="hljs-params">()</span></span> &#123;<br>    nums := []<span class="hljs-type">int</span>&#123;<span class="hljs-number">4</span>, <span class="hljs-number">5</span>, <span class="hljs-number">6</span>, <span class="hljs-number">7</span>, <span class="hljs-number">8</span>, <span class="hljs-number">3</span>, <span class="hljs-number">2</span>, <span class="hljs-number">1</span>&#125;<br>    nums = bubbleSort(nums)<br>    fmt.Println(nums)<br>&#125;<br></code></pre></td></tr></table></figure>
+
 <p><img src="/2025/01/11/%E6%8E%92%E5%BA%8F%E7%AE%97%E6%B3%95/2.webp" srcset="/img/loading.gif" lazyload alt="冒泡排序"></p>
+<h2 id="快速排序"><a href="#快速排序" class="headerlink" title="快速排序"></a>快速排序</h2><h3 id="算法步骤-1"><a href="#算法步骤-1" class="headerlink" title="算法步骤"></a>算法步骤</h3><ol>
+<li><p>从数列中挑出一个元素，称为 “基准”（pivot）;</p>
+</li>
+<li><p>重新排序数列，所有元素比基准值小的摆放在基准前面，所有元素比基准值大的摆在基准的后面（相同的数可以到任一边）。在这个分区退出之后，该基准就处于数列的中间位置。这个称为分区（partition）操作；</p>
+</li>
+<li><p>递归地（recursive）把小于基准值元素的子数列和大于基准值元素的子数列排序；</p>
+</li>
+</ol>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">partition</span><span class="hljs-params">(list []<span class="hljs-type">int</span>, low, high <span class="hljs-type">int</span>)</span></span> <span class="hljs-type">int</span> &#123;<br>    pivot := list[low] <span class="hljs-comment">//导致 low 位置值为空</span><br>    <span class="hljs-keyword">for</span> low &lt; high &#123;<br>        <span class="hljs-comment">//high指针值 &gt;= pivot high指针👈移</span><br>        <span class="hljs-keyword">for</span> low &lt; high &amp;&amp; pivot &lt;= list[high] &#123;<br>            high--<br>        &#125;<br>        <span class="hljs-comment">//填补low位置空值</span><br>        <span class="hljs-comment">//high指针值 &lt; pivot high值 移到low位置</span><br>        <span class="hljs-comment">//high 位置值空</span><br>        list[low] = list[high]<br>        <span class="hljs-comment">//low指针值 &lt;= pivot low指针👉移</span><br>        <span class="hljs-keyword">for</span> low &lt; high &amp;&amp; pivot &gt;= list[low] &#123;<br>            low++<br>        &#125;<br>        <span class="hljs-comment">//填补high位置空值</span><br>        <span class="hljs-comment">//low指针值 &gt; pivot low值 移到high位置</span><br>        <span class="hljs-comment">//low位置值空</span><br>        list[high] = list[low]<br>    &#125;<br>    <span class="hljs-comment">//pivot 填补 low位置的空值</span><br>    list[low] = pivot<br>    <span class="hljs-keyword">return</span> low<br>&#125;<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">QuickSort</span><span class="hljs-params">(list []<span class="hljs-type">int</span>,low,high <span class="hljs-type">int</span>)</span></span>  &#123;<br>    <span class="hljs-keyword">if</span> high &gt; low&#123;<br>        <span class="hljs-comment">//位置划分</span><br>        pivot := partition(list,low,high)<br>        <span class="hljs-comment">//左边部分排序</span><br>        QuickSort(list,low,pivot<span class="hljs-number">-1</span>)<br>        <span class="hljs-comment">//右边排序</span><br>        QuickSort(list,pivot+<span class="hljs-number">1</span>,high)<br>    &#125;<br>&#125;<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">TestQuickSort</span><span class="hljs-params">(t *testing.T)</span></span> &#123;<br>    list := []<span class="hljs-type">int</span>&#123;<span class="hljs-number">2</span>,<span class="hljs-number">44</span>,<span class="hljs-number">4</span>,<span class="hljs-number">8</span>,<span class="hljs-number">33</span>,<span class="hljs-number">1</span>,<span class="hljs-number">22</span>,<span class="hljs-number">-11</span>,<span class="hljs-number">6</span>,<span class="hljs-number">34</span>,<span class="hljs-number">55</span>,<span class="hljs-number">54</span>,<span class="hljs-number">9</span>&#125;<br>    QuickSort(list,<span class="hljs-number">0</span>,<span class="hljs-built_in">len</span>(list)<span class="hljs-number">-1</span>)<br>    t.Log(list)<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p><img src="/2025/01/11/%E6%8E%92%E5%BA%8F%E7%AE%97%E6%B3%95/quick_sort_partition_animation.gif" srcset="/img/loading.gif" lazyload alt="快速排序"></p>
 
                 
               </div>
