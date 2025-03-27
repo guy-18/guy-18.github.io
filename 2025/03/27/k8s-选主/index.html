@@ -1,0 +1,678 @@
+
+
+<!DOCTYPE html>
+<html lang="zh-CN" data-default-color-scheme=auto>
+
+
+
+<head>
+  <meta charset="UTF-8">
+
+  <link rel="apple-touch-icon" sizes="76x76" href="/img/fluid.png">
+  <link rel="icon" href="/img/fluid.png">
+  
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, shrink-to-fit=no">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  
+  <meta name="theme-color" content="#2f4154">
+  <meta name="author" content="John">
+  <meta name="keywords" content="">
+  
+    <meta name="description" content="k8s-选主选主是为了在多副本的情况下，避免同一个操作被所有副本分别执行一次（实际只需要执行一次）。 所以将只需要执行一次的逻辑封装进一个函数，在执行这个函数之前，先进行选主，只有成为leader的副本才会执行该函数。 实际应用中，可以将自定义的controller逻辑封装起来，只在选主成功的副本里运行controller。其余的副本什么也不做，只是待命而已。这样在leader挂了之后，能快速的切">
+<meta property="og:type" content="article">
+<meta property="og:title" content="k8s-选主">
+<meta property="og:url" content="http://guy-18.github.io/2025/03/27/k8s-%E9%80%89%E4%B8%BB/index.html">
+<meta property="og:site_name" content="John的博客">
+<meta property="og:description" content="k8s-选主选主是为了在多副本的情况下，避免同一个操作被所有副本分别执行一次（实际只需要执行一次）。 所以将只需要执行一次的逻辑封装进一个函数，在执行这个函数之前，先进行选主，只有成为leader的副本才会执行该函数。 实际应用中，可以将自定义的controller逻辑封装起来，只在选主成功的副本里运行controller。其余的副本什么也不做，只是待命而已。这样在leader挂了之后，能快速的切">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://guy-18.github.io/2025/03/27/k8s-%E9%80%89%E4%B8%BB/leader_election.png">
+<meta property="article:published_time" content="2025-03-27T14:46:39.000Z">
+<meta property="article:modified_time" content="2025-03-27T14:46:49.694Z">
+<meta property="article:author" content="John">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="http://guy-18.github.io/2025/03/27/k8s-%E9%80%89%E4%B8%BB/leader_election.png">
+  
+  
+  
+  <title>k8s-选主 - John的博客</title>
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/twitter-bootstrap/4.6.1/css/bootstrap.min.css" />
+
+
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/github-markdown-css/4.0.0/github-markdown.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/hint.css/2.7.0/hint.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.css" />
+
+
+
+<!-- 主题依赖的图标库，不要自行修改 -->
+<!-- Do not modify the link that theme dependent icons -->
+
+<link rel="stylesheet" href="//at.alicdn.com/t/c/font_1749284_5i9bdhy70f8.css">
+
+
+
+<link rel="stylesheet" href="//at.alicdn.com/t/c/font_1736178_k526ubmyhba.css">
+
+
+<link  rel="stylesheet" href="/css/main.css" />
+
+
+  <link id="highlight-css" rel="stylesheet" href="/css/highlight.css" />
+  
+    <link id="highlight-css-dark" rel="stylesheet" href="/css/highlight-dark.css" />
+  
+
+
+
+
+  <script id="fluid-configs">
+    var Fluid = window.Fluid || {};
+    Fluid.ctx = Object.assign({}, Fluid.ctx)
+    var CONFIG = {"hostname":"guy-18.github.io","root":"/","version":"1.9.8","typing":{"enable":true,"typeSpeed":70,"cursorChar":"_","loop":false,"scope":[]},"anchorjs":{"enable":true,"element":"h1,h2,h3,h4,h5,h6","placement":"left","visible":"hover","icon":""},"progressbar":{"enable":true,"height_px":3,"color":"#29d","options":{"showSpinner":false,"trickleSpeed":100}},"code_language":{"enable":true,"default":"TEXT"},"copy_btn":true,"image_caption":{"enable":true},"image_zoom":{"enable":true,"img_url_replace":["",""]},"toc":{"enable":true,"placement":"right","headingSelector":"h1,h2,h3,h4,h5,h6","collapseDepth":0},"lazyload":{"enable":true,"loading_img":"/img/loading.gif","onlypost":false,"offset_factor":2},"web_analytics":{"enable":false,"follow_dnt":true,"baidu":null,"google":{"measurement_id":null},"tencent":{"sid":null,"cid":null},"leancloud":{"app_id":null,"app_key":null,"server_url":null,"path":"window.location.pathname","ignore_local":false},"umami":{"src":null,"website_id":null,"domains":null,"start_time":"2024-01-01T00:00:00.000Z","token":null,"api_server":null}},"search_path":"/local-search.xml","include_content_in_search":true};
+
+    if (CONFIG.web_analytics.follow_dnt) {
+      var dntVal = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+      Fluid.ctx.dnt = dntVal && (dntVal.startsWith('1') || dntVal.startsWith('yes') || dntVal.startsWith('on'));
+    }
+  </script>
+  <script  src="/js/utils.js" ></script>
+  <script  src="/js/color-schema.js" ></script>
+  
+
+
+  
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+
+<body>
+  
+
+  <header>
+    
+
+<div class="header-inner" style="height: 70vh;">
+  <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
+  <div class="container">
+    <a class="navbar-brand" href="/">
+      <strong>Fluid</strong>
+    </a>
+
+    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
+            data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <div class="animated-icon"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Collapsible content -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ml-auto text-center">
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/" target="_self">
+                <i class="iconfont icon-home-fill"></i>
+                <span>首页</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/archives/" target="_self">
+                <i class="iconfont icon-archive-fill"></i>
+                <span>归档</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/categories/" target="_self">
+                <i class="iconfont icon-category-fill"></i>
+                <span>分类</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/tags/" target="_self">
+                <i class="iconfont icon-tags-fill"></i>
+                <span>标签</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/about/" target="_self">
+                <i class="iconfont icon-user-fill"></i>
+                <span>关于</span>
+              </a>
+            </li>
+          
+        
+        
+          <li class="nav-item" id="search-btn">
+            <a class="nav-link" target="_self" href="javascript:;" data-toggle="modal" data-target="#modalSearch" aria-label="Search">
+              <i class="iconfont icon-search"></i>
+            </a>
+          </li>
+          
+        
+        
+          <li class="nav-item" id="color-toggle-btn">
+            <a class="nav-link" target="_self" href="javascript:;" aria-label="Color Toggle">
+              <i class="iconfont icon-dark" id="color-toggle-icon"></i>
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+  
+
+<div id="banner" class="banner" parallax=true
+     style="background: url('/img/default.png') no-repeat center center; background-size: cover;">
+  <div class="full-bg-img">
+    <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
+      <div class="banner-text text-center fade-in-up">
+        <div class="h2">
+          
+            <span id="subtitle" data-typed-text="k8s-选主"></span>
+          
+        </div>
+
+        
+          
+  <div class="mt-3">
+    
+    
+      <span class="post-meta">
+        <i class="iconfont icon-date-fill" aria-hidden="true"></i>
+        <time datetime="2025-03-27 22:46" pubdate>
+          2025年3月27日 晚上
+        </time>
+      </span>
+    
+  </div>
+
+  <div class="mt-1">
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-chart"></i>
+        
+          1.6k 字
+        
+      </span>
+    
+
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-clock-fill"></i>
+        
+        
+        
+          14 分钟
+        
+      </span>
+    
+
+    
+    
+  </div>
+
+
+        
+      </div>
+
+      
+    </div>
+  </div>
+</div>
+
+</div>
+
+  </header>
+
+  <main>
+    
+      
+
+<div class="container-fluid nopadding-x">
+  <div class="row nomargin-x">
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+
+    </div>
+
+    <div class="col-lg-8 nopadding-x-md">
+      <div class="container nopadding-x-md" id="board-ctn">
+        <div id="board">
+          <article class="post-content mx-auto">
+            <h1 id="seo-header">k8s-选主</h1>
+            
+            
+              <div class="markdown-body">
+                
+                <h1 id="k8s-选主"><a href="#k8s-选主" class="headerlink" title="k8s-选主"></a>k8s-选主</h1><p>选主是为了在多副本的情况下，避免同一个操作被所有副本分别执行一次（实际只需要执行一次）。</p>
+<p>所以将只需要执行一次的逻辑封装进一个函数，在执行这个函数之前，先进行选主，只有成为leader的副本才会执行该函数。</p>
+<p>实际应用中，可以将自定义的controller逻辑封装起来，只在选主成功的副本里运行controller。其余的副本什么也不做，只是待命而已。这样在leader挂了之后，能快速的切换leader，保证业务逻辑快速恢复。</p>
+<p>转自：<a target="_blank" rel="noopener" href="https://qiankunli.github.io/2021/01/13/kubernetes_leader_election.html">https://qiankunli.github.io/2021/01/13/kubernetes_leader_election.html</a></p>
+<p>假设run 是真正的业务逻辑，加入选主逻辑之后，将run挂在 <code>election.RunOrDie</code> 的 OnStartedLeading 回调上。</p>
+<figure class="highlight dts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><code class="hljs dts">election.RunOrDie(election.LeaderElectionConfig<span class="hljs-punctuation">&#123;</span><br><span class="hljs-symbol">		Lock:</span>          rl,<br><span class="hljs-symbol">		LeaseDuration:</span> leaseDuration,<br><span class="hljs-symbol">		RenewDeadline:</span> renewDuration,<br><span class="hljs-symbol">		RetryPeriod:</span>   retryPeriod,<br><span class="hljs-symbol">		Callbacks:</span> election.LeaderCallbacks<span class="hljs-punctuation">&#123;</span><br><span class="hljs-symbol">			OnStartedLeading:</span> run,	<span class="hljs-comment">// 业务逻辑</span><br><span class="hljs-symbol">			OnStoppedLeading:</span> func() <span class="hljs-punctuation">&#123;</span><br>				log.Fatalf(<span class="hljs-string">&quot;leader election lost&quot;</span>)<br>			<span class="hljs-punctuation">&#125;</span>,<br>		<span class="hljs-punctuation">&#125;</span>,<br>	<span class="hljs-punctuation">&#125;</span>)<br><span class="hljs-comment">// 笔者觉得应该函数封装下，直接 election.RunOrDie(rl,leaseDuration,renewDuration,retryPeriod,run)</span><br></code></pre></td></tr></table></figure>
+
+<h2 id="选主原理"><a href="#选主原理" class="headerlink" title="选主原理"></a>选主原理</h2><p><strong>leaderelection 主要是利用了k8s API操作的原子性实现了一个分布式锁</strong>，在不断的竞争中进行选举。选中为leader的实体才会执行具体的业务代码。</p>
+<p>代码结构</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><code class="hljs go">k8s.io/client-<span class="hljs-keyword">go</span>/tools/leaderelection<br>    /resourcelock<br>        /configmaplock.<span class="hljs-keyword">go</span><br>        /endpointslock.<span class="hljs-keyword">go</span><br>        /<span class="hljs-keyword">interface</span>.<span class="hljs-keyword">go</span>  <span class="hljs-comment">// 定义了锁的操作接口</span><br>        /leaselock.<span class="hljs-keyword">go</span><br>    /leaderelection.<span class="hljs-keyword">go</span><br>    /metrics.<span class="hljs-keyword">go</span><br></code></pre></td></tr></table></figure>
+
+<p><img src="/2025/03/27/k8s-%E9%80%89%E4%B8%BB/leader_election.png" srcset="/img/loading.gif" lazyload alt="img"></p>
+<h3 id="乐观锁"><a href="#乐观锁" class="headerlink" title="乐观锁"></a>乐观锁</h3><p><a target="_blank" rel="noopener" href="http://www.xuyasong.com/?p=2037">K8S 中 scheduler 组件的选主逻辑</a>锁的存在形式：configmap&#x2F;endpoint 的annotation 上，key &#x3D; <code>control-plane.alpha.kubernetes.io/leader</code>， 值对应了 LeaderElectionRecord struct，记录了当前leader 的Identity 以及renewTime</p>
+<figure class="highlight apache"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><code class="hljs apache"><span class="hljs-attribute">apiVersion</span>: v1<br><span class="hljs-attribute">kind</span>: Endpoints<br><span class="hljs-attribute">metadata</span>:<br>  <span class="hljs-attribute">annotations</span>:<br>    <span class="hljs-attribute">control</span>-plane.alpha.kubernetes.io/leader: &#x27;&#123;<span class="hljs-string">&quot;holderIdentity&quot;</span>:<span class="hljs-string">&quot;instance-o24xykos-3_1ad55d32-2abe-49f7-9d68-33ec5eadb906&quot;</span>,<span class="hljs-string">&quot;leaseDurationSeconds&quot;</span>:<span class="hljs-number">15</span>,<span class="hljs-string">&quot;acquireTime&quot;</span>:<span class="hljs-string">&quot;2020-04-23T06:45:07Z&quot;</span>,<span class="hljs-string">&quot;renewTime&quot;</span>:<span class="hljs-string">&quot;2020-04-25T07:55:58Z&quot;</span>,<span class="hljs-string">&quot;leaderTransitions&quot;</span>:<span class="hljs-number">1</span>&#125;&#x27;<br>  <span class="hljs-attribute">creationTimestamp</span>: <span class="hljs-string">&quot;2020-04-22T12:05:29Z&quot;</span><br>  <span class="hljs-attribute">name</span>: kube-scheduler<br>  <span class="hljs-attribute">namespace</span>: kube-system<br>  <span class="hljs-attribute">resourceVersion</span>: <span class="hljs-string">&quot;467853&quot;</span><br>  <span class="hljs-attribute">selfLink</span>: /api/v1/namespaces/kube-system/endpoints/kube-scheduler<br>  <span class="hljs-attribute">uid</span>: f3535807-<span class="hljs-number">0575</span>-<span class="hljs-number">483</span>f-<span class="hljs-number">8471</span>-f8d4fd9eeac6<br></code></pre></td></tr></table></figure>
+
+<p>“锁”即annotation value 记录了 leader 的一些信息</p>
+<figure class="highlight subunit"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><code class="hljs subunit">&#123;<br>    &quot;holderIdentity&quot;: &quot;instance-o24xykos<span class="hljs-string">-3</span>_1ad55d32<span class="hljs-string">-2</span>abe<span class="hljs-string">-49</span>f7<span class="hljs-string">-9</span>d68<span class="hljs-string">-33</span>ec5eadb906&quot;, <br>    &quot;leaseDurationSeconds&quot;: 15, <br>    &quot;acquireTime&quot;: &quot;2020<span class="hljs-string">-04</span><span class="hljs-string">-23</span>T06:45:07Z&quot;, <br>    &quot;renewTime&quot;: &quot;2020<span class="hljs-string">-04</span><span class="hljs-string">-25</span>T07:55:58Z&quot;, <br>    &quot;leaderTransitions&quot;: 1<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>代码体现</p>
+<figure class="highlight elm"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><code class="hljs elm">// k8s.io/client-go/tools/leaderelection/resourcelock/interface.go<br><span class="hljs-keyword">type</span> <span class="hljs-type">Interface</span> interface &#123;<br>	// <span class="hljs-type">Get</span> returns the <span class="hljs-type">LeaderElectionRecord</span><br>	<span class="hljs-type">Get</span>() (*<span class="hljs-type">LeaderElectionRecord</span>, error)<br>	// <span class="hljs-type">Create</span> attempts to create a <span class="hljs-type">LeaderElectionRecord</span><br>	<span class="hljs-type">Create</span>(ler <span class="hljs-type">LeaderElectionRecord</span>) error<br>	// <span class="hljs-type">Update</span> will update and existing <span class="hljs-type">LeaderElectionRecord</span><br>    <span class="hljs-type">Update</span>(ler <span class="hljs-type">LeaderElectionRecord</span>) error<br>    ...<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p><strong>kubernetes 的 update 是原子的、安全的</strong>：Kubernetes 通过定义资源版本字段实现了乐观并发控制，资源版本 (ResourceVersion)字段包含在 Kubernetes 对象的元数据 (Metadata)中。这个字符串格式的字段标识了对象的内部版本号，其取值来自 etcd 的 modifiedindex，且当对象被修改时，该字段将随之被修改。值得注意的是该字段由服务端维护</p>
+<figure class="highlight gauss"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><code class="hljs gauss"><span class="hljs-built_in">type</span> ObjectMeta <span class="hljs-keyword">struct</span> &#123;<br>    <span class="hljs-comment">// An opaque value that represents the internal version of this object that can be used by clients to determine when objects have changed. May be used for optimistic concurrency, change detection, and the watch operation on a   resource or set of resources.Clients must treat these values as opaque and passed unmodified   back to the server.They may only be valid for a particular resource or set of resources.</span><br>    <span class="hljs-comment">// Populated by the system.Read-only.</span><br>    ResourceVersion <span class="hljs-keyword">string</span><br>    ...<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p><strong>所谓的选主，就是看哪个follower能将自己的信息更新到 object 的annotation 上</strong>。</p>
+<h3 id="选主逻辑"><a href="#选主逻辑" class="headerlink" title="选主逻辑"></a>选主逻辑</h3><ol>
+<li>leader 每隔RetryPeriod时间会通过tryAcquireOrRenew续约, 如果续约失败, 还会进行再次尝试. 一直到尝试的总时间超过RenewDeadline后该client就会失去leadership.</li>
+<li>follower 获得leadership需要的等待LeaseDuration 时间.</li>
+</ol>
+<figure class="highlight stylus"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><code class="hljs stylus"><span class="hljs-comment">// client-go/tools/leaderelection/leaderelection.go</span><br>func <span class="hljs-built_in">RunOrDie</span>(ctx context<span class="hljs-selector-class">.Context</span>, lec LeaderElectionConfig) &#123;<br>	le, err := <span class="hljs-built_in">NewLeaderElector</span>(lec)<br>	<span class="hljs-keyword">if</span> err != nil &#123;<br>		<span class="hljs-built_in">panic</span>(err)<br>	&#125;<br>	<span class="hljs-keyword">if</span> lec<span class="hljs-selector-class">.WatchDog</span> != nil &#123;<br>		lec<span class="hljs-selector-class">.WatchDog</span><span class="hljs-selector-class">.SetLeaderElection</span>(le)<br>	&#125;<br>	le<span class="hljs-selector-class">.Run</span>(ctx)<br>&#125;<br><span class="hljs-comment">// 等待，直到ctx 取消/成为leader再失去leader 后返回</span><br>func (le *LeaderElector) <span class="hljs-built_in">Run</span>(ctx context.Context) &#123;<br>	defer <span class="hljs-built_in">func</span>() &#123;<br>		runtime<span class="hljs-selector-class">.HandleCrash</span>()<br>		le<span class="hljs-selector-class">.config</span><span class="hljs-selector-class">.Callbacks</span><span class="hljs-selector-class">.OnStoppedLeading</span>()<br>    &#125;()<br>    <span class="hljs-comment">// 等待，除非成为leader（返回true） 或者ctx 取消（返回false）</span><br>	<span class="hljs-keyword">if</span> !le<span class="hljs-selector-class">.acquire</span>(ctx) &#123;<br>		return <br>	&#125;<br>	ctx, cancel := context<span class="hljs-selector-class">.WithCancel</span>(ctx)<br>	defer <span class="hljs-built_in">cancel</span>()<br>    go le<span class="hljs-selector-class">.config</span><span class="hljs-selector-class">.Callbacks</span><span class="hljs-selector-class">.OnStartedLeading</span>(ctx)	<span class="hljs-comment">// 执行业务方法</span><br>    <span class="hljs-comment">// 成为leader后周期性续期，如果ctx 取消或失去leader 则立即返回</span><br>	le<span class="hljs-selector-class">.renew</span>(ctx)<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>选主核心逻辑</p>
+<ol>
+<li>没有lock，抢占&#x2F;Create</li>
+<li>已有lock，但是别人的，租约没过期则退出 再试，过期则抢占&#x2F;Update</li>
+<li>已有lock，自己的，续期&#x2F;Update</li>
+</ol>
+<p>函数返回 True 说明本 goroutine 已成功抢占到锁，获得租约合同，成为 leader</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(le *LeaderElector)</span></span> tryAcquireOrRenew() <span class="hljs-type">bool</span> &#123;<br>	now := metav1.Now()<br>	leaderElectionRecord := rl.LeaderElectionRecord&#123;...&#125;<br>	<span class="hljs-comment">// 1. obtain or create the ElectionRecord</span><br>	oldLeaderElectionRecord, err := le.config.Lock.Get()<br>	<span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<br>        <span class="hljs-comment">// 获取锁信息失败则直接返回</span><br>		<span class="hljs-keyword">if</span> !errors.IsNotFound(err) &#123;<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>&#125;<br>        <span class="hljs-comment">// 锁不存在则创建，创建失败则返回</span><br>		<span class="hljs-keyword">if</span> err = le.config.Lock.Create(leaderElectionRecord); err != <span class="hljs-literal">nil</span> &#123;<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>&#125;<br>        <span class="hljs-comment">// 创建lock成功 即第一次选主抢占leader 成功，则返回</span><br>		<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span><br>	&#125;<br>	<span class="hljs-comment">// 2. Record obtained, check the Identity &amp; Time</span><br>	<span class="hljs-keyword">if</span> <span class="hljs-built_in">len</span>(oldLeaderElectionRecord.HolderIdentity) &gt; <span class="hljs-number">0</span> &amp;&amp; le.observedTime.Add(le.config.LeaseDuration).After(now.Time) &amp;&amp;!le.IsLeader() &#123; <span class="hljs-comment">// 其他leader 未过期</span><br>		<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span><br>	&#125;<br>	<span class="hljs-comment">// 3. We&#x27;re going to try to update. The leaderElectionRecord is set to it&#x27;s default</span><br>	<span class="hljs-comment">// here. Let&#x27;s correct it before updating.</span><br>	<span class="hljs-keyword">if</span> le.IsLeader() &#123;<br>		leaderElectionRecord.AcquireTime = oldLeaderElectionRecord.AcquireTime<br>		leaderElectionRecord.LeaderTransitions = oldLeaderElectionRecord.LeaderTransitions<br>	&#125; <span class="hljs-keyword">else</span> &#123;<br>		leaderElectionRecord.LeaderTransitions = oldLeaderElectionRecord.LeaderTransitions + <span class="hljs-number">1</span><br>	&#125;<br>	<span class="hljs-comment">// update the lock itself</span><br>	<span class="hljs-keyword">if</span> err = le.config.Lock.Update(leaderElectionRecord); err != <span class="hljs-literal">nil</span> &#123;<br>        <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span><br>    &#125;<br>	<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span><br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>通过LeaderCallbacks 感知leader 状态变化。回调OnStartedLeading 和 OnNewLeader 都会另起协程执行。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-keyword">type</span> LeaderCallbacks <span class="hljs-keyword">struct</span> &#123;<br>    <span class="hljs-comment">// OnStartedLeading is called when a LeaderElector client starts leading</span><br>    <span class="hljs-comment">// 当选主逻辑退出时，会通过 context 传给OnStartedLeading</span><br>	OnStartedLeading <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">(context.Context)</span></span><br>	<span class="hljs-comment">// OnStoppedLeading is called when a LeaderElector client stops leading</span><br>	OnStoppedLeading <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">()</span></span><br>	<span class="hljs-comment">// OnNewLeader is called when the client observes a leader that is not the previously observed leader. This includes the first observed leader when the client starts.</span><br>	OnNewLeader <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">(identity <span class="hljs-type">string</span>)</span></span><br>&#125;<br></code></pre></td></tr></table></figure>
+
+<h2 id="应用示例"><a href="#应用示例" class="headerlink" title="应用示例"></a>应用示例</h2><p>k8s scheduler 调度器的执行入口是 <code>sched.Run</code></p>
+<figure class="highlight stata"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><code class="hljs stata"><span class="hljs-comment">// k8s.io/kubernetes/cmd/kube-scheduler/app/server.go</span><br>func <span class="hljs-keyword">Run</span>(ctx context.Context, <span class="hljs-keyword">cc</span> schedulerserverconfig.CompletedConfig, outOfTreeRegistryOptions ...Option) <span class="hljs-keyword">error</span> &#123;<br>    ...<br>    <span class="hljs-comment">// If leader election is enabled, runCommand via LeaderElector until done and exit.</span><br>    <span class="hljs-keyword">if</span> <span class="hljs-keyword">cc</span>.LeaderElection != nil &#123;<br>        <span class="hljs-keyword">cc</span>.LeaderElection.Callbacks = leaderelection.LeaderCallbacks&#123;<br>            OnStartedLeading: sched.<span class="hljs-keyword">Run</span>,    <span class="hljs-comment">// 本节点成为leader时运行</span><br>            OnStoppedLeading: func() &#123;<br>                klog.Fatalf(<span class="hljs-string">&quot;leaderelection lost&quot;</span>)<br>            &#125;,<br>        &#125;<br>        leaderElector, <span class="hljs-keyword">err</span> := leaderelection.NewLeaderElector(*<span class="hljs-keyword">cc</span>.LeaderElection)<br>        <span class="hljs-keyword">if</span> <span class="hljs-keyword">err</span> != nil &#123;<br>            <span class="hljs-keyword">return</span> fmt.Errorf(<span class="hljs-string">&quot;couldn&#x27;t create leader elector: %v&quot;</span>, <span class="hljs-keyword">err</span>)<br>        &#125;<br>        leaderElector.<span class="hljs-keyword">Run</span>(ctx)<br>        <span class="hljs-keyword">return</span> fmt.Errorf(<span class="hljs-string">&quot;lost lease&quot;</span>)<br>    &#125;<br>    <span class="hljs-comment">// 如果未开启选主</span><br>    sched.<span class="hljs-keyword">Run</span>(ctx)<br>	<span class="hljs-keyword">return</span> fmt.Errorf(<span class="hljs-string">&quot;finished without leader elect&quot;</span>)<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>k8s controller-manager 的选主逻辑</p>
+<figure class="highlight stylus"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><code class="hljs stylus"><span class="hljs-comment">// Run runs the KubeControllerManagerOptions.  This should never exit.</span><br>func <span class="hljs-built_in">Run</span>(c *config<span class="hljs-selector-class">.CompletedConfig</span>, stopCh &lt;-chan struct&#123;&#125;) error &#123;<br>    ...<br>    run := <span class="hljs-built_in">func</span>(ctx context.Context) &#123;<br>        ...<br>    &#125;<br>    ...<br>    rl, err := resourcelock<span class="hljs-selector-class">.New</span>(c<span class="hljs-selector-class">.ComponentConfig</span><span class="hljs-selector-class">.Generic</span><span class="hljs-selector-class">.LeaderElection</span><span class="hljs-selector-class">.ResourceLock</span>,...)<br>	<span class="hljs-keyword">if</span> err != nil &#123;<br>		klog<span class="hljs-selector-class">.Fatalf</span>(<span class="hljs-string">&quot;error creating lock: %v&quot;</span>, err)<br>    &#125;<br>    leaderelection<span class="hljs-selector-class">.RunOrDie</span>(context<span class="hljs-selector-class">.TODO</span>(), leaderelection.LeaderElectionConfig&#123;<br>		Lock:          rl,<br>		LeaseDuration: c<span class="hljs-selector-class">.ComponentConfig</span><span class="hljs-selector-class">.Generic</span><span class="hljs-selector-class">.LeaderElection</span><span class="hljs-selector-class">.LeaseDuration</span><span class="hljs-selector-class">.Duration</span>,<br>		RenewDeadline: c<span class="hljs-selector-class">.ComponentConfig</span><span class="hljs-selector-class">.Generic</span><span class="hljs-selector-class">.LeaderElection</span><span class="hljs-selector-class">.RenewDeadline</span><span class="hljs-selector-class">.Duration</span>,<br>		RetryPeriod:   c<span class="hljs-selector-class">.ComponentConfig</span><span class="hljs-selector-class">.Generic</span><span class="hljs-selector-class">.LeaderElection</span><span class="hljs-selector-class">.RetryPeriod</span><span class="hljs-selector-class">.Duration</span>,<br>		Callbacks: leaderelection.LeaderCallbacks&#123;<br>			OnStartedLeading: run,<br>			OnStoppedLeading: <span class="hljs-built_in">func</span>() &#123;<br>				klog<span class="hljs-selector-class">.Fatalf</span>(<span class="hljs-string">&quot;leaderelection lost&quot;</span>)<br>			&#125;,<br>		&#125;,<br>		WatchDog: electionChecker,<br>		Name:     <span class="hljs-string">&quot;kube-controller-manager&quot;</span>,<br>    &#125;)<br>    <span class="hljs-built_in">panic</span>(<span class="hljs-string">&quot;unreachable&quot;</span>)<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>controller-runtime 是k8s 为支持自定义Controller 写的公共库，入口代码即为<code>Controller.Start</code></p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(cm *controllerManager)</span></span> Start(stop &lt;-<span class="hljs-keyword">chan</span> <span class="hljs-keyword">struct</span>&#123;&#125;) <span class="hljs-type">error</span> &#123;<br>    ...<br>    <span class="hljs-comment">// 启动不用选主的任务</span><br>    <span class="hljs-keyword">go</span> cm.startNonLeaderElectionRunnables()<br>	<span class="hljs-keyword">if</span> cm.resourceLock != <span class="hljs-literal">nil</span> &#123; <span class="hljs-comment">// 如果resourceLock 不为空， 表示需要选主，启动选主逻辑</span><br>		err := cm.startLeaderElection()<br>		<span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<span class="hljs-keyword">return</span> err&#125;<br>	&#125; <br>    ...<br>&#125;<br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(cm *controllerManager)</span></span> startLeaderElection() (err <span class="hljs-type">error</span>) &#123;<br>	l, err := leaderelection.NewLeaderElector(leaderelection.LeaderElectionConfig&#123;<br>		Lock:          cm.resourceLock,<br>		Callbacks: leaderelection.LeaderCallbacks&#123;<br>			OnStartedLeading: <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">(_ context.Context)</span></span> &#123;<br>				cm.startLeaderElectionRunnables()   <span class="hljs-comment">// 启动需要选主的任务</span><br>			&#125;,<br>			OnStoppedLeading: <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">()</span></span> &#123;<br>				cm.errSignal.SignalError(fmt.Errorf(<span class="hljs-string">&quot;leader election lost&quot;</span>))<br>			&#125;,<br>		&#125;,<br>	&#125;)<br>	ctx, cancel := context.WithCancel(context.Background())<br>	<span class="hljs-keyword">go</span> <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">()</span></span> &#123;<br>		<span class="hljs-keyword">select</span> &#123;<br>		<span class="hljs-keyword">case</span> &lt;-cm.internalStop:<br>			cancel()<br>		<span class="hljs-keyword">case</span> &lt;-ctx.Done():<br>		&#125;<br>	&#125;()<br>	<span class="hljs-comment">// Start the leader elector process</span><br>	<span class="hljs-keyword">go</span> l.Run(ctx)<br>	<span class="hljs-keyword">return</span> <span class="hljs-literal">nil</span><br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>从示例中可以看到</p>
+<ol>
+<li>选主一般是一次性的，成为leader 后即执行核心业务逻辑，或者说业务逻辑由OnStartedLeading 触发。</li>
+<li>如果成为leader 后失去leader，则主协程执行结束。</li>
+</ol>
+<p>scheduler 和 controller-manager 部署在容器中，所以主协程执行结束后，一般会自动重启。</p>
+
+                
+              </div>
+            
+            <hr/>
+            <div>
+              <div class="post-metas my-3">
+  
+  
+</div>
+
+
+              
+  
+
+  <div class="license-box my-3">
+    <div class="license-title">
+      <div>k8s-选主</div>
+      <div>http://guy-18.github.io/2025/03/27/k8s-选主/</div>
+    </div>
+    <div class="license-meta">
+      
+        <div class="license-meta-item">
+          <div>作者</div>
+          <div>John</div>
+        </div>
+      
+      
+        <div class="license-meta-item license-meta-date">
+          <div>发布于</div>
+          <div>2025年3月27日</div>
+        </div>
+      
+      
+      
+        <div class="license-meta-item">
+          <div>许可协议</div>
+          <div>
+            
+              
+              
+                <a class="print-no-link" target="_blank" href="https://creativecommons.org/licenses/by/4.0/">
+                  <span class="hint--top hint--rounded" aria-label="BY - 署名">
+                    <i class="iconfont icon-cc-by"></i>
+                  </span>
+                </a>
+              
+            
+          </div>
+        </div>
+      
+    </div>
+    <div class="license-icon iconfont"></div>
+  </div>
+
+
+
+              
+                <div class="post-prevnext my-3">
+                  <article class="post-prev col-6">
+                    
+                    
+                      <a href="/2025/03/27/k8s-%E9%80%89%E4%B8%BB-%E5%AE%9E%E6%88%98%E9%AA%8C%E8%AF%81/" title="k8s-选主">
+                        <i class="iconfont icon-arrowleft"></i>
+                        <span class="hidden-mobile">k8s-选主</span>
+                        <span class="visible-mobile">上一篇</span>
+                      </a>
+                    
+                  </article>
+                  <article class="post-next col-6">
+                    
+                    
+                      <a href="/2025/03/25/golang%E5%AE%9E%E7%8E%B0%E7%94%9F%E4%BA%A7%E8%80%85%E6%B6%88%E8%B4%B9%E8%80%85%E6%A8%A1%E5%9E%8B/" title="golang实现生产者消费者模型">
+                        <span class="hidden-mobile">golang实现生产者消费者模型</span>
+                        <span class="visible-mobile">下一篇</span>
+                        <i class="iconfont icon-arrowright"></i>
+                      </a>
+                    
+                  </article>
+                </div>
+              
+            </div>
+
+            
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+  <aside class="sidebar" style="margin-left: -1rem">
+    <div id="toc">
+  <p class="toc-header">
+    <i class="iconfont icon-list"></i>
+    <span>目录</span>
+  </p>
+  <div class="toc-body" id="toc-body"></div>
+</div>
+
+
+
+  </aside>
+
+
+    </div>
+  </div>
+</div>
+
+
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+
+
+
+
+    
+
+    
+      <a id="scroll-top-button" aria-label="TOP" href="#" role="button">
+        <i class="iconfont icon-arrowup" aria-hidden="true"></i>
+      </a>
+    
+
+    
+      <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header text-center">
+        <h4 class="modal-title w-100 font-weight-bold">搜索</h4>
+        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body mx-3">
+        <div class="md-form mb-5">
+          <input type="text" id="local-search-input" class="form-control validate">
+          <label data-error="x" data-success="v" for="local-search-input">关键词</label>
+        </div>
+        <div class="list-group" id="local-search-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+    
+
+    
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+  
+    <div class="footer-content">
+       <a href="https://hexo.io" target="_blank" rel="nofollow noopener"><span>Hexo</span></a> <i class="iconfont icon-love"></i> <a href="https://github.com/fluid-dev/hexo-theme-fluid" target="_blank" rel="nofollow noopener"><span>Fluid</span></a> 
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+
+  <!-- Scripts -->
+  
+  <script  src="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.js" ></script>
+  <link  rel="stylesheet" href="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.css" />
+
+  <script>
+    NProgress.configure({"showSpinner":false,"trickleSpeed":100})
+    NProgress.start()
+    window.addEventListener('load', function() {
+      NProgress.done();
+    })
+  </script>
+
+
+<script  src="https://lib.baomitu.com/jquery/3.6.4/jquery.min.js" ></script>
+<script  src="https://lib.baomitu.com/twitter-bootstrap/4.6.1/js/bootstrap.min.js" ></script>
+<script  src="/js/events.js" ></script>
+<script  src="/js/plugins.js" ></script>
+
+
+  <script  src="https://lib.baomitu.com/typed.js/2.0.12/typed.min.js" ></script>
+  <script>
+    (function (window, document) {
+      var typing = Fluid.plugins.typing;
+      var subtitle = document.getElementById('subtitle');
+      if (!subtitle || !typing) {
+        return;
+      }
+      var text = subtitle.getAttribute('data-typed-text');
+      
+        typing(text);
+      
+    })(window, document);
+  </script>
+
+
+
+
+  
+    <script  src="/js/img-lazyload.js" ></script>
+  
+
+
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/tocbot/4.20.1/tocbot.min.js', function() {
+    var toc = jQuery('#toc');
+    if (toc.length === 0 || !window.tocbot) { return; }
+    var boardCtn = jQuery('#board-ctn');
+    var boardTop = boardCtn.offset().top;
+
+    window.tocbot.init(Object.assign({
+      tocSelector     : '#toc-body',
+      contentSelector : '.markdown-body',
+      linkClass       : 'tocbot-link',
+      activeLinkClass : 'tocbot-active-link',
+      listClass       : 'tocbot-list',
+      isCollapsedClass: 'tocbot-is-collapsed',
+      collapsibleClass: 'tocbot-is-collapsible',
+      scrollSmooth    : true,
+      includeTitleTags: true,
+      headingsOffset  : -boardTop,
+    }, CONFIG.toc));
+    if (toc.find('.toc-list-item').length > 0) {
+      toc.css('visibility', 'visible');
+    }
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('tocbot' in window) {
+        tocbot.refresh();
+        var toc = jQuery('#toc');
+        if (toc.length === 0 || !tocbot) {
+          return;
+        }
+        if (toc.find('.toc-list-item').length > 0) {
+          toc.css('visibility', 'visible');
+        }
+      }
+    });
+  });
+</script>
+
+
+  <script src=https://lib.baomitu.com/clipboard.js/2.0.11/clipboard.min.js></script>
+
+  <script>Fluid.plugins.codeWidget();</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/anchor-js/5.0.0/anchor.min.js', function() {
+    window.anchors.options = {
+      placement: CONFIG.anchorjs.placement,
+      visible  : CONFIG.anchorjs.visible
+    };
+    if (CONFIG.anchorjs.icon) {
+      window.anchors.options.icon = CONFIG.anchorjs.icon;
+    }
+    var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+    var res = [];
+    for (var item of el) {
+      res.push('.markdown-body > ' + item.trim());
+    }
+    if (CONFIG.anchorjs.placement === 'left') {
+      window.anchors.options.class = 'anchorjs-link-left';
+    }
+    window.anchors.add(res.join(', '));
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('anchors' in window) {
+        anchors.removeAll();
+        var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+        var res = [];
+        for (var item of el) {
+          res.push('.markdown-body > ' + item.trim());
+        }
+        if (CONFIG.anchorjs.placement === 'left') {
+          anchors.options.class = 'anchorjs-link-left';
+        }
+        anchors.add(res.join(', '));
+      }
+    });
+  });
+</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.js', function() {
+    Fluid.plugins.fancyBox();
+  });
+</script>
+
+
+  <script>Fluid.plugins.imageCaption();</script>
+
+  <script  src="/js/local-search.js" ></script>
+
+
+
+
+
+<!-- 主题的启动项，将它保持在最底部 -->
+<!-- the boot of the theme, keep it at the bottom -->
+<script  src="/js/boot.js" ></script>
+
+
+  
+
+  <noscript>
+    <div class="noscript-warning">博客在允许 JavaScript 运行的环境下浏览效果更佳</div>
+  </noscript>
+</body>
+</html>
