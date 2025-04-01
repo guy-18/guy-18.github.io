@@ -229,39 +229,6 @@
     <article class="col-12 col-md-12 mx-auto index-info">
       <h2 class="index-header">
         
-        <a href="/2025/03/27/k8s-%E9%80%89%E4%B8%BB/" target="_self">
-          k8s-选主
-        </a>
-      </h2>
-
-      
-      <a class="index-excerpt index-excerpt__noimg" href="/2025/03/27/k8s-%E9%80%89%E4%B8%BB/" target="_self">
-        <div>
-          k8s-选主选主是为了在多副本的情况下，避免同一个操作被所有副本分别执行一次（实际只需要执行一次）。 所以将只需要执行一次的逻辑封装进一个函数，在执行这个函数之前，先进行选主，只有成为leader的副本才会执行该函数。 实际应用中，可以将自定义的controller逻辑封装起来，只在选主成功的副本里运行controller。其余的副本什么也不做，只是待命而已。这样在leader挂了之后，能快速的切
-        </div>
-      </a>
-
-      <div class="index-btm post-metas">
-        
-          <div class="post-meta mr-3">
-            <i class="iconfont icon-date"></i>
-            <time datetime="2025-03-27 22:46" pubdate>
-              2025-03-27
-            </time>
-          </div>
-        
-        
-        
-      </div>
-    </article>
-  </div>
-
-  <div class="row mx-auto index-card">
-    
-    
-    <article class="col-12 col-md-12 mx-auto index-info">
-      <h2 class="index-header">
-        
         <a href="/2025/03/25/golang%E5%AE%9E%E7%8E%B0%E7%94%9F%E4%BA%A7%E8%80%85%E6%B6%88%E8%B4%B9%E8%80%85%E6%A8%A1%E5%9E%8B/" target="_self">
           golang实现生产者消费者模型
         </a>
@@ -544,6 +511,39 @@
             <i class="iconfont icon-date"></i>
             <time datetime="2024-12-08 22:09" pubdate>
               2024-12-08
+            </time>
+          </div>
+        
+        
+        
+      </div>
+    </article>
+  </div>
+
+  <div class="row mx-auto index-card">
+    
+    
+    <article class="col-12 col-md-12 mx-auto index-info">
+      <h2 class="index-header">
+        
+        <a href="/2024/12/05/%E5%A4%A7%E7%BA%B2/" target="_self">
+          大纲
+        </a>
+      </h2>
+
+      
+      <a class="index-excerpt index-excerpt__noimg" href="/2024/12/05/%E5%A4%A7%E7%BA%B2/" target="_self">
+        <div>
+          Go 为什么对slice append时，要用原来的变量来接收s &#x3D; append(s, 1)  因为append是一个函数，函数的传参是值拷贝，传进去的s在函数内部已经是另一个s了，而函数外部原来的s.len并不会被改变，所以要用函数返回的新s来覆盖原来的s go内存管理go协程原理go并发编程go网络编程 gin框架 context包 channel底层原理 实现M:N生产者消费者模
+        </div>
+      </a>
+
+      <div class="index-btm post-metas">
+        
+          <div class="post-meta mr-3">
+            <i class="iconfont icon-date"></i>
+            <time datetime="2024-12-05 21:40" pubdate>
+              2024-12-05
             </time>
           </div>
         
