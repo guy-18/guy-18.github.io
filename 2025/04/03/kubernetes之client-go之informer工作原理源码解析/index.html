@@ -1,0 +1,733 @@
+
+
+<!DOCTYPE html>
+<html lang="zh-CN" data-default-color-scheme=auto>
+
+
+
+<head>
+  <meta charset="UTF-8">
+
+  <link rel="apple-touch-icon" sizes="76x76" href="/img/fluid.png">
+  <link rel="icon" href="/img/fluid.png">
+  
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, shrink-to-fit=no">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  
+  <meta name="theme-color" content="#2f4154">
+  <meta name="author" content="John">
+  <meta name="keywords" content="">
+  
+    <meta name="description" content="转自：https:&#x2F;&#x2F;blog.haohtml.com&#x2F;archives&#x2F;32179&#x2F; kubernetes 之 client-go 之 informer 工作原理源码解析本文主要介绍有关 client go 架构实现原理，在整个client-go架构中有一个很重要的组件就是 informer，本节我们重点对其进行一些介绍。 Informer 机制采用 k8s HTTP API 可以查询集群中所有">
+<meta property="og:type" content="article">
+<meta property="og:title" content="kubernetes之client-go之informer工作原理源码解析">
+<meta property="og:url" content="http://guy-18.github.io/2025/04/03/kubernetes%E4%B9%8Bclient-go%E4%B9%8Binformer%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90/index.html">
+<meta property="og:site_name" content="John的博客">
+<meta property="og:description" content="转自：https:&#x2F;&#x2F;blog.haohtml.com&#x2F;archives&#x2F;32179&#x2F; kubernetes 之 client-go 之 informer 工作原理源码解析本文主要介绍有关 client go 架构实现原理，在整个client-go架构中有一个很重要的组件就是 informer，本节我们重点对其进行一些介绍。 Informer 机制采用 k8s HTTP API 可以查询集群中所有">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://guy-18.github.io/2025/04/03/kubernetes%E4%B9%8Bclient-go%E4%B9%8Binformer%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90/client-go-controller-interaction.jpeg">
+<meta property="og:image" content="https://blogstatic.haohtml.com/uploads/2023/04/d2b5ca33bd970f64a6301fa75ae2eb22-3.png">
+<meta property="og:image" content="https://blogstatic.haohtml.com/uploads/2023/04/d2b5ca33bd970f64a6301fa75ae2eb22-2.png">
+<meta property="og:image" content="https://blogstatic.haohtml.com/uploads/2023/08/d2b5ca33bd970f64a6301fa75ae2eb22-1.png">
+<meta property="og:image" content="https://blogstatic.haohtml.com/uploads/2023/08/d2b5ca33bd970f64a6301fa75ae2eb22-2.png">
+<meta property="article:published_time" content="2025-04-02T16:29:29.000Z">
+<meta property="article:modified_time" content="2025-04-02T16:35:07.677Z">
+<meta property="article:author" content="John">
+<meta property="article:tag" content="k8s">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="http://guy-18.github.io/2025/04/03/kubernetes%E4%B9%8Bclient-go%E4%B9%8Binformer%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90/client-go-controller-interaction.jpeg">
+  
+  
+  
+  <title>kubernetes之client-go之informer工作原理源码解析 - John的博客</title>
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/twitter-bootstrap/4.6.1/css/bootstrap.min.css" />
+
+
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/github-markdown-css/4.0.0/github-markdown.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/hint.css/2.7.0/hint.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.css" />
+
+
+
+<!-- 主题依赖的图标库，不要自行修改 -->
+<!-- Do not modify the link that theme dependent icons -->
+
+<link rel="stylesheet" href="//at.alicdn.com/t/c/font_1749284_5i9bdhy70f8.css">
+
+
+
+<link rel="stylesheet" href="//at.alicdn.com/t/c/font_1736178_k526ubmyhba.css">
+
+
+<link  rel="stylesheet" href="/css/main.css" />
+
+
+  <link id="highlight-css" rel="stylesheet" href="/css/highlight.css" />
+  
+    <link id="highlight-css-dark" rel="stylesheet" href="/css/highlight-dark.css" />
+  
+
+
+
+
+  <script id="fluid-configs">
+    var Fluid = window.Fluid || {};
+    Fluid.ctx = Object.assign({}, Fluid.ctx)
+    var CONFIG = {"hostname":"guy-18.github.io","root":"/","version":"1.9.8","typing":{"enable":true,"typeSpeed":70,"cursorChar":"_","loop":false,"scope":[]},"anchorjs":{"enable":true,"element":"h1,h2,h3,h4,h5,h6","placement":"left","visible":"hover","icon":""},"progressbar":{"enable":true,"height_px":3,"color":"#29d","options":{"showSpinner":false,"trickleSpeed":100}},"code_language":{"enable":true,"default":"TEXT"},"copy_btn":true,"image_caption":{"enable":true},"image_zoom":{"enable":true,"img_url_replace":["",""]},"toc":{"enable":true,"placement":"right","headingSelector":"h1,h2,h3,h4,h5,h6","collapseDepth":0},"lazyload":{"enable":true,"loading_img":"/img/loading.gif","onlypost":false,"offset_factor":2},"web_analytics":{"enable":false,"follow_dnt":true,"baidu":null,"google":{"measurement_id":null},"tencent":{"sid":null,"cid":null},"leancloud":{"app_id":null,"app_key":null,"server_url":null,"path":"window.location.pathname","ignore_local":false},"umami":{"src":null,"website_id":null,"domains":null,"start_time":"2024-01-01T00:00:00.000Z","token":null,"api_server":null}},"search_path":"/local-search.xml","include_content_in_search":true};
+
+    if (CONFIG.web_analytics.follow_dnt) {
+      var dntVal = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+      Fluid.ctx.dnt = dntVal && (dntVal.startsWith('1') || dntVal.startsWith('yes') || dntVal.startsWith('on'));
+    }
+  </script>
+  <script  src="/js/utils.js" ></script>
+  <script  src="/js/color-schema.js" ></script>
+  
+
+
+  
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+
+<body>
+  
+
+  <header>
+    
+
+<div class="header-inner" style="height: 70vh;">
+  <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
+  <div class="container">
+    <a class="navbar-brand" href="/">
+      <strong>Fluid</strong>
+    </a>
+
+    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
+            data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <div class="animated-icon"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Collapsible content -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ml-auto text-center">
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/" target="_self">
+                <i class="iconfont icon-home-fill"></i>
+                <span>首页</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/archives/" target="_self">
+                <i class="iconfont icon-archive-fill"></i>
+                <span>归档</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/categories/" target="_self">
+                <i class="iconfont icon-category-fill"></i>
+                <span>分类</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/tags/" target="_self">
+                <i class="iconfont icon-tags-fill"></i>
+                <span>标签</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/about/" target="_self">
+                <i class="iconfont icon-user-fill"></i>
+                <span>关于</span>
+              </a>
+            </li>
+          
+        
+        
+          <li class="nav-item" id="search-btn">
+            <a class="nav-link" target="_self" href="javascript:;" data-toggle="modal" data-target="#modalSearch" aria-label="Search">
+              <i class="iconfont icon-search"></i>
+            </a>
+          </li>
+          
+        
+        
+          <li class="nav-item" id="color-toggle-btn">
+            <a class="nav-link" target="_self" href="javascript:;" aria-label="Color Toggle">
+              <i class="iconfont icon-dark" id="color-toggle-icon"></i>
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+  
+
+<div id="banner" class="banner" parallax=true
+     style="background: url('/img/default.png') no-repeat center center; background-size: cover;">
+  <div class="full-bg-img">
+    <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
+      <div class="banner-text text-center fade-in-up">
+        <div class="h2">
+          
+            <span id="subtitle" data-typed-text="kubernetes之client-go之informer工作原理源码解析"></span>
+          
+        </div>
+
+        
+          
+  <div class="mt-3">
+    
+    
+      <span class="post-meta">
+        <i class="iconfont icon-date-fill" aria-hidden="true"></i>
+        <time datetime="2025-04-03 00:29" pubdate>
+          2025年4月3日 凌晨
+        </time>
+      </span>
+    
+  </div>
+
+  <div class="mt-1">
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-chart"></i>
+        
+          4.5k 字
+        
+      </span>
+    
+
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-clock-fill"></i>
+        
+        
+        
+          38 分钟
+        
+      </span>
+    
+
+    
+    
+  </div>
+
+
+        
+      </div>
+
+      
+    </div>
+  </div>
+</div>
+
+</div>
+
+  </header>
+
+  <main>
+    
+      
+
+<div class="container-fluid nopadding-x">
+  <div class="row nomargin-x">
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+
+    </div>
+
+    <div class="col-lg-8 nopadding-x-md">
+      <div class="container nopadding-x-md" id="board-ctn">
+        <div id="board">
+          <article class="post-content mx-auto">
+            <h1 id="seo-header">kubernetes之client-go之informer工作原理源码解析</h1>
+            
+            
+              <div class="markdown-body">
+                
+                <p>转自：<a target="_blank" rel="noopener" href="https://blog.haohtml.com/archives/32179/">https://blog.haohtml.com/archives/32179/</a></p>
+<h1 id="kubernetes-之-client-go-之-informer-工作原理源码解析"><a href="#kubernetes-之-client-go-之-informer-工作原理源码解析" class="headerlink" title="kubernetes 之 client-go 之 informer 工作原理源码解析"></a>kubernetes 之 client-go 之 informer 工作原理源码解析</h1><p>本文主要介绍有关 <code>client go</code> 架构实现原理，在整个client-go架构中有一个很重要的组件就是 <code>informer</code>，本节我们重点对其进行一些介绍。</p>
+<h1 id="Informer-机制"><a href="#Informer-机制" class="headerlink" title="Informer 机制"></a>Informer 机制</h1><p>采用 k8s HTTP API 可以查询集群中所有的资源对象并 Watch 其变化，但大量的 HTTP 调用会对 API Server 造成较大的负荷，而且网络调用可能存在较大的延迟。除此之外，开发者还需要在程序中处理资源的缓存，HTTP 链接出问题后的重连等。为了解决这些问题并简化 Controller 的开发工作，K8s 在 client go 中提供了一个 <code>informer</code> 客户端库，可以视其为一个组件。</p>
+<p>在 Kubernetes 中，<code>Informer</code> 可以用于监视 Kubernetes API 服务器中的资源并将它们的当前状态缓存到本地(<code>index -&gt; store)</code> ，这样就避免了客户端不断地向 API 服务器发送请求，直接从本地即可。</p>
+<p>相比直接采用 HTTP Watch，使用 Kubernetes Informer 有以下优势：</p>
+<ul>
+<li>减少 API 服务器的负载：通过在本地缓存资源信息，Informer 减少了需要向 API 服务器发出的请求数量。这可以防止由于 API 服务器过载而影响整个集群的性能。</li>
+<li>提高应用程序性能：使用缓存的数据，客户端应用程序可以快速访问资源信息，而无需等待 API 服务器响应。这可以提高应用程序性能并减少延迟。</li>
+<li>简化代码：Informer 提供了一种更简单、更流畅的方式来监视 Kubernetes 中的资源更改。客户端应用程序可以使用现有的 Informer 库来处理这些任务，而无需编写复杂的代码来管理与 API 服务器的连接并处理更新。</li>
+<li>更高的可靠性：由于 Informer 在本地缓存数据，因此即使 API 服务器不可用或存在问题，它们也可以继续工作。这可以确保客户端应用程序即使在底层 Kubernetes 基础结构出现问题时也能保持功能。</li>
+</ul>
+<p>下面一起看一下 client-go 库的实现原理</p>
+<h1 id="架构介绍"><a href="#架构介绍" class="headerlink" title="架构介绍"></a>架构介绍</h1><p>我们先看一下来自 <a target="_blank" rel="noopener" href="https://github.com/kubernetes/sample-controller/blob/master/docs/images/client-go-controller-interaction.jpeg">官方</a> 的 <code>client-go</code> 架构图</p>
+<p><img src="/2025/04/03/kubernetes%E4%B9%8Bclient-go%E4%B9%8Binformer%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90/client-go-controller-interaction.jpeg" srcset="/img/loading.gif" lazyload alt="client-go-controller-interaction.jpeg"></p>
+<p>整个架构图分上、下两部分，其中上部分为 <code>client-go</code> 的实现，而下部分是我们自己要实现的 <code>Custom Controller</code>，每部分由不同的组件组成，上下两部分通过虚线连接起来。其介绍请参考 <a target="_blank" rel="noopener" href="https://github.com/kubernetes/sample-controller/blob/master/docs/controller-client-go.md">https://github.com/kubernetes/sample-controller/blob/master/docs/controller-client-go.md</a></p>
+<blockquote>
+<p>有时候 <code>Controller</code> 也被叫做 <code>Operator</code>，这两个术语的混用有时让人感到迷惑。 <code>Controller</code> 是一个通用的术语，凡是遵循 “Watch K8s 资源并根据资源变化进行调谐” 模式的控制程序都可以叫做 <code>Controller</code>。而 <code>Operator</code> 是一种专用的 <code>Controller</code>，用于在 Kubernetes 中管理一些复杂的 <strong>有状态</strong> 的应用程序。例如在 Kubernetes 中管理 MySQL 数据库的 MySQL Operator。</p>
+</blockquote>
+<p>在实现 <code>controller</code> 时一般在 <code>Informer</code> 配置回调函数 <code>Callbacks（ResourceEventHandlers）</code>来实现 <code>Informer</code> 和 <code>Custom Controller</code> 上下两部分之间的通讯，这个在上面的链接里均有介绍。如果上图不容易理解的话，也可以参考下面两张架构图。<img src="https://blogstatic.haohtml.com/uploads/2023/04/d2b5ca33bd970f64a6301fa75ae2eb22-3.png" srcset="/img/loading.gif" lazyload alt="img"><img src="https://blogstatic.haohtml.com/uploads/2023/04/d2b5ca33bd970f64a6301fa75ae2eb22-2.png" srcset="/img/loading.gif" lazyload alt="img"></p>
+<p>注意这里写入 <code>workqueue</code> 队列的是API对象的 <code>key</code>， 即 <code>namespace/name</code>；接着在控制循环 <code>Control Loop</code> 里先从 <code>workqueue</code> 读取这个 <code>key</code>；然后根据 <code>key</code>从 <code>indexer</code> 缓存里读取对象。如果对象不存在则说明前面是通过 <code>DeleteFunc</code> 写入的，则需要删除key， 否则进行其它处理，执行控制器模式里的对比“<code>期望状态</code>” 和 “<code>实际状态</code>”的逻辑了。</p>
+<p>下面根据官网给出的架构图，我们一起看一下它的实现代码。</p>
+<h1 id="架构实现源码分析"><a href="#架构实现源码分析" class="headerlink" title="架构实现源码分析"></a>架构实现源码分析</h1><p>这里以官方提供的 <a target="_blank" rel="noopener" href="https://github.com/kubernetes/client-go/blob/v12.0.0/examples/workqueue/README.md">workqueue</a> 示例为例，按照上方的架构图对其 <strong>每一个步骤</strong> 进行源码分析</p>
+<p>入口函数为 main函数中的 <code>go controller.Run(1, stop)</code></p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// /examples/workqueue/main.go</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">main</span><span class="hljs-params">()</span></span> &#123;<br>	...<br><br>	<span class="hljs-comment">// create the pod watcher</span><br>	podListWatcher := cache.NewListWatchFromClient(clientset.CoreV1().RESTClient(), <span class="hljs-string">&quot;pods&quot;</span>, v1.NamespaceDefault, fields.Everything())<br><br>	<span class="hljs-comment">// create the workqueue</span><br>	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())<br><br>	<span class="hljs-comment">// 创建 indexer 和 informer</span><br>	indexer, informer := cache.NewIndexerInformer(podListWatcher, &amp;v1.Pod&#123;&#125;, <span class="hljs-number">0</span>, cache.ResourceEventHandlerFuncs&#123;&#125;<br><br>	controller := NewController(queue, indexer, informer)<br><br>	stop := <span class="hljs-built_in">make</span>(<span class="hljs-keyword">chan</span> <span class="hljs-keyword">struct</span>&#123;&#125;)<br>	<span class="hljs-keyword">defer</span> <span class="hljs-built_in">close</span>(stop)<br>	<span class="hljs-keyword">go</span> controller.Run(<span class="hljs-number">1</span>, stop)<br><br>	<span class="hljs-keyword">select</span> &#123;&#125;<br>&#125;<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">NewController</span><span class="hljs-params">(queue workqueue.RateLimitingInterface, indexer cache.Indexer, informer cache.Controller)</span></span> *Controller &#123;<br>	<span class="hljs-keyword">return</span> &amp;Controller&#123;<br>		informer: informer,<br>		indexer:  indexer,<br>		queue:    queue,<br>	&#125;<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>这里创建的是一个 <code>pods</code> 类型的 <code>ListWatch</code>, 接着创建了一个带 <strong>限速率</strong> 功能的 <code>workqueue</code>（底层queue 的实现对应代码为 <a target="_blank" rel="noopener" href="https://github.com/kubernetes/client-go/blob/v12.0.0/util/workqueue/queue.go#L64-L88%EF%BC%89">https://github.com/kubernetes/client-go/blob/v12.0.0/util/workqueue/queue.go#L64-L88）</a>, 然后调用 <code>cache.NewIndexInformer</code> 来创建 <code>indexer</code> 和 <code>informer</code>。</p>
+<p>这里的 <code>workqueue</code> 主要是在 <code>ResoureEventHandlers</code> 回调时调用，对应的是第 <code>7) Enqueue Object Key</code> 步骤。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// /examples/workqueue/main.go</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(c *Controller)</span></span> Run(threadiness <span class="hljs-type">int</span>, stopCh <span class="hljs-keyword">chan</span> <span class="hljs-keyword">struct</span>&#123;&#125;) &#123;<br>	<span class="hljs-keyword">defer</span> runtime.HandleCrash()<br><br>	<span class="hljs-comment">// Let the workers stop when we are done</span><br>	<span class="hljs-keyword">defer</span> c.queue.ShutDown()<br>	klog.Info(<span class="hljs-string">&quot;Starting Pod controller&quot;</span>)<br><br>	<span class="hljs-comment">// 启用 informer 服务</span><br>	<span class="hljs-keyword">go</span> c.informer.Run(stopCh)<br><br>	<span class="hljs-comment">// Wait for all involved caches to be synced, before processing items from the queue is started</span><br>	<span class="hljs-keyword">if</span> !cache.WaitForCacheSync(stopCh, c.informer.HasSynced) &#123;<br>		runtime.HandleError(fmt.Errorf(<span class="hljs-string">&quot;Timed out waiting for caches to sync&quot;</span>))<br>		<span class="hljs-keyword">return</span><br>	&#125;<br><br>	<span class="hljs-comment">// 业务逻辑回调 c.runWorker</span><br>	<span class="hljs-keyword">for</span> i := <span class="hljs-number">0</span>; i &lt; threadiness; i++ &#123;<br>		<span class="hljs-keyword">go</span> wait.Until(c.runWorker, time.Second, stopCh)<br>	&#125;<br><br>	&lt;-stopCh<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>这里首先调用 <code>go c.informer.Run()</code> 来启用 informer 服务，让其在一个单独的 <code>goroutine</code> 运行， 其实现对应架构图中的 1~7 步骤。</p>
+<p>接着再调用 <code>go wait.Until(c.runWorker, time.Second, stopCh)</code> 来实现自定义控制器的逻辑，其对应架构图中的 8~9 步骤。</p>
+<p>下面我们先看一下 <code>informer</code> 服务的实现 （ <a target="_blank" rel="noopener" href="https://github.com/kubernetes/client-go/blob/v12.0.0/tools/cache/controller.go#L97-L125%EF%BC%89%E3%80%82">https://github.com/kubernetes/client-go/blob/v12.0.0/tools/cache/controller.go#L97-L125）。</a></p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// /tools/cache/controller.go</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(c *controller)</span></span> Run(stopCh &lt;-<span class="hljs-keyword">chan</span> <span class="hljs-keyword">struct</span>&#123;&#125;) &#123;<br><br>    <span class="hljs-comment">// 首先创建 Reflector</span><br>    r := NewReflector(<br>        c.config.ListerWatcher,<br>        c.config.ObjectType,<br>        c.config.Queue,<br>        c.config.FullResyncPeriod,<br>    )<br><br><br>    <span class="hljs-comment">// 启用 Reflector 服务</span><br>    wg.StartWithChannel(stopCh, r.Run)<br><br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>首先创建一个 <code>Reflector</code> 对象，并注入 <code>podListWatcher</code> 和 <code>Delta Fifo Queue</code> 队列， 其中 <code>ObjectType</code> 为 <code>&amp;v1.Pod&#123;&#125;</code>，接着启用 <code>Reflector</code> 服务（<a target="_blank" rel="noopener" href="https://github.com/kubernetes/client-go/blob/v12.0.0/tools/cache/reflector.go#L119-L128%EF%BC%89">https://github.com/kubernetes/client-go/blob/v12.0.0/tools/cache/reflector.go#L119-L128）</a></p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// /tools/cache/reflector.go</span><br><span class="hljs-comment">// Run starts a watch and handles watch events. Will restart the watch if it is closed.</span><br><span class="hljs-comment">// Run will exit when stopCh is closed.</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(r *Reflector)</span></span> Run(stopCh &lt;-<span class="hljs-keyword">chan</span> <span class="hljs-keyword">struct</span>&#123;&#125;) &#123;<br>    <span class="hljs-comment">// 启用 ListAndWatch</span><br>    wait.Until(<span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">()</span></span> &#123;<br>        <span class="hljs-keyword">if</span> err := r.ListAndWatch(stopCh); err != <span class="hljs-literal">nil</span> &#123;<br>            utilruntime.HandleError(err)<br>        &#125;<br>    &#125;, r.period, stopCh)<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>接着看一下 <code>r.ListAndWatch()</code> 实现 （<a target="_blank" rel="noopener" href="https://github.com/kubernetes/client-go/blob/v12.0.0/tools/cache/reflector.go#L156-L307%EF%BC%89">https://github.com/kubernetes/client-go/blob/v12.0.0/tools/cache/reflector.go#L156-L307）</a></p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// It returns error if ListAndWatch didn&#x27;t even try to initialize watch.</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(r *Reflector)</span></span> ListAndWatch(stopCh &lt;-<span class="hljs-keyword">chan</span> <span class="hljs-keyword">struct</span>&#123;&#125;) <span class="hljs-type">error</span> &#123;<br><br>    <span class="hljs-comment">// 当前为客户端首次请求资源的情况</span><br>    <span class="hljs-keyword">if</span> err := <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">()</span></span> <span class="hljs-type">error</span> &#123;<br>        <span class="hljs-keyword">go</span> <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">()</span></span> &#123;<br>            <span class="hljs-keyword">defer</span> <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">()</span></span> &#123;<br>                <span class="hljs-keyword">if</span> r := <span class="hljs-built_in">recover</span>(); r != <span class="hljs-literal">nil</span> &#123;<br>                    panicCh &lt;- r<br>                &#125;<br>            &#125;()<br><br>            <span class="hljs-comment">// 1. 向 apiserver 发送请求</span><br>            <span class="hljs-comment">// 如果支持 listerWatcher，则尝试以 chunks 的方式获取资源列表; 否则第一个列表就返回完整的响应</span><br>            pager := pager.New(pager.SimplePageFunc(<span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">(opts metav1.ListOptions)</span></span> (runtime.Object, <span class="hljs-type">error</span>) &#123;<br>                <span class="hljs-keyword">return</span> r.listerWatcher.List(opts)<br>            &#125;))<br>            <span class="hljs-keyword">if</span> r.WatchListPageSize != <span class="hljs-number">0</span> &#123;<br>                pager.PageSize = r.WatchListPageSize<br>            &#125;<br>            <span class="hljs-comment">// Pager falls back to full list if paginated list calls fail due to an &quot;Expired&quot; error.</span><br>            list, err = pager.List(context.Background(), options)<br>            <span class="hljs-built_in">close</span>(listCh)<br>        &#125;()<br><br>        <span class="hljs-comment">// 2. 读取响应 以 channel通道的方式获取上面 goroutine 的响应结果</span><br>        <span class="hljs-keyword">select</span> &#123;<br>        <span class="hljs-keyword">case</span> &lt;-stopCh:<br>            <span class="hljs-keyword">return</span> <span class="hljs-literal">nil</span><br>        <span class="hljs-keyword">case</span> r := &lt;-panicCh:<br>            <span class="hljs-built_in">panic</span>(r)<br>        <span class="hljs-keyword">case</span> &lt;-listCh:<br>        &#125;<br>        <span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<br>            <span class="hljs-keyword">return</span> fmt.Errorf(<span class="hljs-string">&quot;%s: Failed to list %v: %v&quot;</span>, r.name, r.expectedType, err)<br>        &#125;<br><br>        <span class="hljs-comment">// 3.1 从响应结果列表里获取版本号信息</span><br>        listMetaInterface, err := meta.ListAccessor(list)<br>        resourceVersion = listMetaInterface.GetResourceVersion()<br><br>        items, err := meta.ExtractList(list)<br>        <span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<br>            <span class="hljs-keyword">return</span> fmt.Errorf(<span class="hljs-string">&quot;%s: Unable to understand list result %#v (%v)&quot;</span>, r.name, list, err)<br>        &#125;<br><br>        <span class="hljs-comment">// 3.2 根据上次获取的版本号同步最新记录, 更新 Store(Delta FIIO queue) 为最新内容</span><br>        <span class="hljs-keyword">if</span> err := r.syncWith(items, resourceVersion); err != <span class="hljs-literal">nil</span> &#123;<br>            <span class="hljs-keyword">return</span> fmt.Errorf(<span class="hljs-string">&quot;%s: Unable to sync list result: %v&quot;</span>, r.name, err)<br>        &#125;<br><br>        <span class="hljs-comment">// 3.3 更新最新版本号</span><br>        r.setLastSyncResourceVersion(resourceVersion)<br><br>        <span class="hljs-keyword">return</span> <span class="hljs-literal">nil</span><br>    &#125;<br><br><br>    <span class="hljs-comment">// 非首次则根据版本号来获取最新变更资源</span><br>    <span class="hljs-keyword">for</span> &#123;<br>        <span class="hljs-comment">// give the stopCh a chance to stop the loop, even in case of continue statements further down on errors</span><br>        <span class="hljs-keyword">select</span> &#123;<br>        <span class="hljs-keyword">case</span> &lt;-stopCh:<br>            <span class="hljs-keyword">return</span> <span class="hljs-literal">nil</span><br>        <span class="hljs-keyword">default</span>:<br>        &#125;<br><br>        timeoutSeconds := <span class="hljs-type">int64</span>(minWatchTimeout.Seconds() * (rand.Float64() + <span class="hljs-number">1.0</span>))<br>        options = metav1.ListOptions&#123;<br>            ResourceVersion: resourceVersion,<br>            TimeoutSeconds: &amp;timeoutSeconds,<br>            AllowWatchBookmarks: <span class="hljs-literal">false</span>,<br>        &#125;<br><br>        <span class="hljs-comment">// 根据版本号获取最新资源，并将更新信息写入 Delta Fifo Queue</span><br>        w, err := r.listerWatcher.Watch(options)<br>        <span class="hljs-keyword">if</span> err := r.watchHandler(w, &amp;resourceVersion, resyncerrc, stopCh); err != <span class="hljs-literal">nil</span> &#123;<br>            <span class="hljs-keyword">if</span> err != errorStopRequested &#123;<br>                klog.Warningf(<span class="hljs-string">&quot;%s: watch of %v ended with: %v&quot;</span>, r.name, r.expectedType, err)<br>            &#125;<br>            <span class="hljs-keyword">return</span> <span class="hljs-literal">nil</span><br>        &#125;<br>    &#125;<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>对于首次访问 <code>apiserver</code>，如果支持 <code>listerWatcher</code> 的话，则以 <code>chunk</code> 的方式获取资源 ，否则一次性获取完整的资源信息，然后再从响应结果里读取当前资源信息号。</p>
+<p>当获取资源列表后，对于以后更新的资源，则需要根据 <code>上次的版本号</code> 来监控以后变更的资源，这样就可以只监控后续变更的资源即可，大大减少数据的传输，即这里是以 <code>增量</code> 方式获取资源，后续的操作从这个 <code>增量队列</code> 里获取资源信息即可。</p>
+<p>上面这些对应的正是架构图中的 <code>1) List &amp; Watch</code> 步骤。</p>
+<p>我们再看一下 <code>r.watchHandler</code> 的实现</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// watchHandler watches w and keeps *resourceVersion up to date.</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(r *Reflector)</span></span> watchHandler(w watch.Interface, resourceVersion *<span class="hljs-type">string</span>, errc <span class="hljs-keyword">chan</span> <span class="hljs-type">error</span>, stopCh &lt;-<span class="hljs-keyword">chan</span> <span class="hljs-keyword">struct</span>&#123;&#125;) <span class="hljs-type">error</span> &#123;<br><br>    ...<br><br>loop:<br>    <span class="hljs-keyword">for</span> &#123;<br>        <span class="hljs-keyword">select</span> &#123;<br>        <span class="hljs-keyword">case</span> &lt;-stopCh:<br>            <span class="hljs-keyword">return</span> errorStopRequested<br>        <span class="hljs-keyword">case</span> err := &lt;-errc:<br>            <span class="hljs-keyword">return</span> err<br>        <span class="hljs-keyword">case</span> event, ok := &lt;-w.ResultChan():<br>            <span class="hljs-keyword">if</span> !ok &#123;<br>                <span class="hljs-keyword">break</span> loop<br>            &#125;<br>            <span class="hljs-keyword">if</span> event.Type == watch.Error &#123;<br>                <span class="hljs-keyword">return</span> apierrs.FromObject(event.Object)<br>            &#125;<br>            <span class="hljs-keyword">if</span> e, a := r.expectedType, reflect.TypeOf(event.Object); e != <span class="hljs-literal">nil</span> &amp;&amp; e != a &#123;<br>                utilruntime.HandleError(fmt.Errorf(<span class="hljs-string">&quot;%s: expected type %v, but watch event object had type %v&quot;</span>, r.name, e, a))<br>                <span class="hljs-keyword">continue</span><br>            &#125;<br>            meta, err := meta.Accessor(event.Object)<br>            <span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<br>                utilruntime.HandleError(fmt.Errorf(<span class="hljs-string">&quot;%s: unable to understand watch event %#v&quot;</span>, r.name, event))<br>                <span class="hljs-keyword">continue</span><br>            &#125;<br>            newResourceVersion := meta.GetResourceVersion()<br><br>            <span class="hljs-comment">// 更新 Delta Fifo Queue</span><br>            <span class="hljs-keyword">switch</span> event.Type &#123;<br>            <span class="hljs-keyword">case</span> watch.Added:<br>                <span class="hljs-comment">// 对应 tools/cache/delta_fifo.go#L171-L178</span><br>                err := r.store.Add(event.Object)<br>                <span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<br>                    utilruntime.HandleError(fmt.Errorf(<span class="hljs-string">&quot;%s: unable to add watch event object (%#v) to store: %v&quot;</span>, r.name, event.Object, err))<br>                &#125;<br>            <span class="hljs-keyword">case</span> watch.Modified:<br>                err := r.store.Update(event.Object)<br>                <span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<br>                    utilruntime.HandleError(fmt.Errorf(<span class="hljs-string">&quot;%s: unable to update watch event object (%#v) to store: %v&quot;</span>, r.name, event.Object, err))<br>                &#125;<br>            <span class="hljs-keyword">case</span> watch.Deleted:<br>                err := r.store.Delete(event.Object)<br>                <span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<br>                    utilruntime.HandleError(fmt.Errorf(<span class="hljs-string">&quot;%s: unable to delete watch event object (%#v) from store: %v&quot;</span>, r.name, event.Object, err))<br>                &#125;<br>            <span class="hljs-keyword">case</span> watch.Bookmark:<br>                <span class="hljs-comment">// A `Bookmark` means watch has synced here, just update the resourceVersion</span><br>            <span class="hljs-keyword">default</span>:<br>                utilruntime.HandleError(fmt.Errorf(<span class="hljs-string">&quot;%s: unable to understand watch event %#v&quot;</span>, r.name, event))<br>            &#125;<br>            *resourceVersion = newResourceVersion<br>            r.setLastSyncResourceVersion(newResourceVersion)<br>            eventCount++<br>        &#125;<br>    &#125;<br><br>    watchDuration := r.clock.Since(start)<br>    <span class="hljs-keyword">if</span> watchDuration &lt; <span class="hljs-number">1</span>*time.Second &amp;&amp; eventCount == <span class="hljs-number">0</span> &#123;<br>        <span class="hljs-keyword">return</span> fmt.Errorf(<span class="hljs-string">&quot;very short watch: %s: Unexpected watch close - watch lasted less than a second and no items received&quot;</span>, r.name)<br><br>    <span class="hljs-keyword">return</span> <span class="hljs-literal">nil</span><br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>这里只是对增量队列 <code>Delta Fifo queue</code> 里的资源进行了更新操作，其实现代码见 <a target="_blank" rel="noopener" href="https://github.com/kubernetes/client-go/blob/v12.0.0/tools/cache/delta_fifo.go#L171-L220">https://github.com/kubernetes/client-go/blob/v12.0.0/tools/cache/delta_fifo.go#L171-L220</a> ， 其对应的正是 <code>2）Add Object</code> 这一步。</p>
+<p>对于 <code>3）Pop Object</code> 这个操作入口函数为 <code>processLoop</code> ( <a target="_blank" rel="noopener" href="https://github.com/kubernetes/client-go/blob/v12.0.0/tools/cache/controller.go#L139-L161">https://github.com/kubernetes/client-go/blob/v12.0.0/tools/cache/controller.go#L139-L161</a>)</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// /tools/cache/controller.go</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(c *controller)</span></span> processLoop() &#123;<br>	<span class="hljs-keyword">for</span> &#123;<br><br>		<span class="hljs-comment">// 从 Delta Fifo Queue 读取对象</span><br>		obj, err := c.config.Queue.Pop(PopProcessFunc(c.config.Process))<br>		<span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<br>			<span class="hljs-keyword">if</span> err == FIFOClosedError &#123;<br>				<span class="hljs-keyword">return</span><br>			&#125;<br>			<span class="hljs-keyword">if</span> c.config.RetryOnError &#123;<br>				<span class="hljs-comment">// This is the safe way to re-enqueue.</span><br>				c.config.Queue.AddIfNotPresent(obj)<br>			&#125;<br>		&#125;<br>	&#125;<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>其增量队列Pop实现见</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// /tools/cache/delta_fifo.go</span><br><span class="hljs-comment">// Pop returns a &#x27;Deltas&#x27;, which has a complete list of all the things</span><br><span class="hljs-comment">// that happened to the object (deltas) while it was sitting in the queue.</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(f *DeltaFIFO)</span></span> Pop(process PopProcessFunc) (<span class="hljs-keyword">interface</span>&#123;&#125;, <span class="hljs-type">error</span>) &#123;<br>    f.lock.Lock()<br>    <span class="hljs-keyword">defer</span> f.lock.Unlock()<br>    <span class="hljs-keyword">for</span> &#123;<br>        <span class="hljs-keyword">for</span> <span class="hljs-built_in">len</span>(f.queue) == <span class="hljs-number">0</span> &#123;<br>            <span class="hljs-comment">// 阻塞方式获取一个对象</span><br>            <span class="hljs-comment">// When the queue is empty, invocation of Pop() is blocked until new item is enqueued.</span><br>            <span class="hljs-comment">// When Close() is called, the f.closed is set and the condition is broadcasted.</span><br>            <span class="hljs-comment">// Which causes this loop to continue and return from the Pop().</span><br>            <span class="hljs-keyword">if</span> f.IsClosed() &#123;<br>                <span class="hljs-keyword">return</span> <span class="hljs-literal">nil</span>, FIFOClosedError<br>            &#125;<br><br>            f.cond.Wait()<br>        &#125;<br><br>        <span class="hljs-comment">// f.queue 是一个slice, 这里获取首个元素后并更新这个切片</span><br>        id := f.queue[<span class="hljs-number">0</span>]<br>        f.queue = f.queue[<span class="hljs-number">1</span>:]<br>        <span class="hljs-keyword">if</span> f.initialPopulationCount &gt; <span class="hljs-number">0</span> &#123;<br>            f.initialPopulationCount--<br>        &#125;<br><br>        <span class="hljs-comment">// 将id作为key从items这个 map 中获取 Deltas 信息</span><br>        item, ok := f.items[id]<br>        <span class="hljs-keyword">if</span> !ok &#123;<br>            <span class="hljs-comment">// Item may have been deleted subsequently.</span><br>            <span class="hljs-keyword">continue</span><br>        &#125;<br>        <span class="hljs-built_in">delete</span>(f.items, id)<br><br>        <span class="hljs-comment">// 这里 process 是下一步的进入</span><br>        err := process(item)<br>        <span class="hljs-keyword">if</span> e, ok := err.(ErrRequeue); ok &#123;<br>            f.addIfNotPresent(id, item)<br>            err = e.Err<br>        &#125;<br>        <span class="hljs-comment">// Don&#x27;t need to copyDeltas here, because we&#x27;re transferring</span><br>        <span class="hljs-comment">// ownership to the caller.</span><br>        <span class="hljs-keyword">return</span> item, err<br>    &#125;<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>这个 <code>process</code> 函数在这里是作为一个参数传递过来的，其声明位置为</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// /tools/cache/controller.go</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">newInformer</span><span class="hljs-params">(</span></span><br><span class="hljs-params"><span class="hljs-function">    lw ListerWatcher,</span></span><br><span class="hljs-params"><span class="hljs-function">    objType runtime.Object,</span></span><br><span class="hljs-params"><span class="hljs-function">    resyncPeriod time.Duration,</span></span><br><span class="hljs-params"><span class="hljs-function">    h ResourceEventHandler,</span></span><br><span class="hljs-params"><span class="hljs-function">    clientState Store,</span></span><br><span class="hljs-params"><span class="hljs-function">)</span></span> Controller &#123;<br>    ...<br><br>    cfg := &amp;Config&#123;<br>        ...<br><br>        Process: <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">(obj <span class="hljs-keyword">interface</span>&#123;&#125;)</span></span> <span class="hljs-type">error</span> &#123;<br>            <span class="hljs-comment">// from oldest to newest</span><br>            <span class="hljs-keyword">for</span> _, d := <span class="hljs-keyword">range</span> obj.(Deltas) &#123;<br>                <span class="hljs-keyword">switch</span> d.Type &#123;<br>                <span class="hljs-keyword">case</span> Sync, Added, Updated:<br>                    <span class="hljs-keyword">if</span> old, exists, err := clientState.Get(d.Object); err == <span class="hljs-literal">nil</span> &amp;&amp; exists &#123;<br>                        <span class="hljs-comment">// 对应第 4） 和 5) 步骤</span><br>                        <span class="hljs-keyword">if</span> err := clientState.Update(d.Object); err != <span class="hljs-literal">nil</span> &#123;<br>                            <span class="hljs-keyword">return</span> err<br>                        &#125;<br>                        h.OnUpdate(old, d.Object)<br>                    &#125; <span class="hljs-keyword">else</span> &#123;<br>                        <span class="hljs-keyword">if</span> err := clientState.Add(d.Object); err != <span class="hljs-literal">nil</span> &#123;<br>                            <span class="hljs-keyword">return</span> err<br>                        &#125;<br>                        h.OnAdd(d.Object)<br>                    &#125;<br>                <span class="hljs-keyword">case</span> Deleted:<br>                    <span class="hljs-keyword">if</span> err := clientState.Delete(d.Object); err != <span class="hljs-literal">nil</span> &#123;<br>                        <span class="hljs-keyword">return</span> err<br>                    &#125;<br>                    h.OnDelete(d.Object)<br>                &#125;<br>            &#125;<br>            <span class="hljs-keyword">return</span> <span class="hljs-literal">nil</span><br>        &#125;,<br>    &#125;<br>        <span class="hljs-keyword">return</span> New(cfg)<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>对应的是 <code>Config.Process</code> 这个函数。</p>
+<p>对于架构图中的 <code>4)Add Object</code> 和 <code>5）Store Object &amp; Key</code> 对应的则是对 <code>clientState</code> 的调用。</p>
+<p>而 <code>6）Dispatch Event Handler functions</code> 则为对 对象 <code>h</code> 的调用，它是一个实现了 <code>Resource Event Handlers</code> 接口的结构体，它有三个实现方法 <code>h.OnAdd</code> 、<code>h.OnUpdate</code> 和 <code>h.OnDelete</code>，而这三个方法原型已在 main 函数里实现。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// /examples/workqueue/main.go</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">main</span><span class="hljs-params">()</span></span> &#123;<br>    ...<br><br>    <span class="hljs-comment">// Bind the workqueue to a cache with the help of an informer. This way we make sure that</span><br>    <span class="hljs-comment">// whenever the cache is updated, the pod key is added to the workqueue.</span><br>    <span class="hljs-comment">// Note that when we finally process the item from the workqueue, we might see a newer version</span><br>    <span class="hljs-comment">// of the Pod than the version which was responsible for triggering the update.</span><br>    indexer, informer := cache.NewIndexerInformer(podListWatcher, &amp;v1.Pod&#123;&#125;, <span class="hljs-number">0</span>, cache.ResourceEventHandlerFuncs&#123;<br>        AddFunc: <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">(obj <span class="hljs-keyword">interface</span>&#123;&#125;)</span></span> &#123;<br>            key, err := cache.MetaNamespaceKeyFunc(obj)<br>            <span class="hljs-keyword">if</span> err == <span class="hljs-literal">nil</span> &#123;<br>                queue.Add(key)<br>            &#125;<br>        &#125;,<br>        UpdateFunc: <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">(old <span class="hljs-keyword">interface</span>&#123;&#125;, <span class="hljs-built_in">new</span> <span class="hljs-keyword">interface</span>&#123;&#125;)</span></span> &#123;<br>            key, err := cache.MetaNamespaceKeyFunc(<span class="hljs-built_in">new</span>)<br>            <span class="hljs-keyword">if</span> err == <span class="hljs-literal">nil</span> &#123;<br>                queue.Add(key)<br>            &#125;<br>        &#125;,<br>        DeleteFunc: <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">(obj <span class="hljs-keyword">interface</span>&#123;&#125;)</span></span> &#123;<br>            <span class="hljs-comment">// IndexerInformer uses a delta queue, therefore for deletes we have to use this</span><br>            <span class="hljs-comment">// key function.</span><br>            key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)<br>            <span class="hljs-keyword">if</span> err == <span class="hljs-literal">nil</span> &#123;<br>                queue.Add(key)<br>            &#125;<br>        &#125;,<br>    &#125;, cache.Indexers&#123;&#125;)<br><br>    ...<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>这里使用的结构体名为 <code>cache.ResourceEventHandlerFuncs</code> ()</p>
+<p>在 main 函数里的 <code>queue.Add(key)</code> 则对应的是步骤 <code>7) Enqueue Object key</code>, 将 <code>key</code> 写入一个 <code>workqueue</code> 队列。</p>
+<p>而对于 <code>8）Get key</code> 则对应的是 <a target="_blank" rel="noopener" href="https://github.com/kubernetes/client-go/blob/v12.0.0/examples/workqueue/main.go#L51-L67">controller.processNextItem()</a></p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// /examples/workqueue/main.go</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(c *Controller)</span></span> processNextItem() <span class="hljs-type">bool</span> &#123;<br>	<span class="hljs-comment">// Wait until there is a new item in the working queue</span><br>	<span class="hljs-comment">// 对应 8 步骤，从wprkqueue 里读取一个 key</span><br>	key, quit := c.queue.Get()<br>	<span class="hljs-keyword">if</span> quit &#123;<br>		<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span><br>	&#125;<br>	<span class="hljs-comment">// Tell the queue that we are done with processing this key. This unblocks the key for other workers</span><br>	<span class="hljs-comment">// This allows safe parallel processing because two pods with the same key are never processed in</span><br>	<span class="hljs-comment">// parallel.</span><br>	<span class="hljs-keyword">defer</span> c.queue.Done(key)<br><br>	<span class="hljs-comment">// Invoke the method containing the business logic</span><br>	err := c.syncToStdout(key.(<span class="hljs-type">string</span>))<br><br>	<span class="hljs-comment">// 出错，重试 5 次</span><br>	<span class="hljs-comment">// Handle the error if something went wrong during the execution of the business logic</span><br>	c.handleErr(err, key)<br><br>	<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span><br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>从 <code>workqueue</code> 里获取一个key， 通过 <a target="_blank" rel="noopener" href="https://github.com/kubernetes/client-go/blob/v12.0.0/examples/workqueue/main.go#L69-L88">controller.syncToStdout()</a> <code>9) Get Object for key</code>处理。最后调用 <code>c.queue.Done()</code> 表示当前 <code>key</code> 处理完毕。</p>
+<p>而 <code>9) Get Object for key</code> 对应 <a target="_blank" rel="noopener" href="https://github.com/kubernetes/client-go/blob/v12.0.0/examples/workqueue/main.go#L69-L88">controller.syncToStdout()</a> 函数的实现</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// /examples/workqueue/main.go</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(c *Controller)</span></span> syncToStdout(key <span class="hljs-type">string</span>) <span class="hljs-type">error</span> &#123;<br>	<span class="hljs-comment">// 对应步骤 9，从 index 里读取对象</span><br>	obj, exists, err := c.indexer.GetByKey(key)<br>	<span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<br>		klog.Errorf(<span class="hljs-string">&quot;Fetching object with key %s from store failed with %v&quot;</span>, key, err)<br>		<span class="hljs-keyword">return</span> err<br>	&#125;<br><br>	<span class="hljs-keyword">if</span> !exists &#123;<br>		<span class="hljs-comment">// Below we will warm up our cache with a Pod, so that we will see a delete for one pod</span><br>		fmt.Printf(<span class="hljs-string">&quot;Pod %s does not exist anymoren&quot;</span>, key)<br>	&#125; <span class="hljs-keyword">else</span> &#123;<br>		<span class="hljs-comment">// Note that you also have to check the uid if you have a local controlled resource, which</span><br>		<span class="hljs-comment">// is dependent on the actual instance, to detect that a Pod was recreated with the same name</span><br>		fmt.Printf(<span class="hljs-string">&quot;Sync/Add/Update for Pod %sn&quot;</span>, obj.(*v1.Pod).GetName())<br>	&#125;<br>	<span class="hljs-keyword">return</span> <span class="hljs-literal">nil</span><br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>可以看到对 <code>workqueue</code> 的写入与读取全部在 <code>Custom Controller</code> 部分来实现的，有时候对一个对象处理会出现失败的情况，这种情况下就需要对其 key 进行 <code>RateLimited</code> 了。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// handleErr checks if an error happened and makes sure we will retry later.</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(c *Controller)</span></span> handleErr(err <span class="hljs-type">error</span>, key <span class="hljs-keyword">interface</span>&#123;&#125;) &#123;<br>	<span class="hljs-keyword">if</span> err == <span class="hljs-literal">nil</span> &#123;<br>		<span class="hljs-comment">// Forget about the #AddRateLimited history of the key on every successful synchronization.</span><br>		<span class="hljs-comment">// This ensures that future processing of updates for this key is not delayed because of</span><br>		<span class="hljs-comment">// an outdated error history.</span><br>		c.queue.Forget(key)<br>		<span class="hljs-keyword">return</span><br>	&#125;<br><br>	<span class="hljs-comment">// This controller retries 5 times if something goes wrong. After that, it stops trying.</span><br>	<span class="hljs-keyword">if</span> c.queue.NumRequeues(key) &lt; <span class="hljs-number">5</span> &#123;<br>		klog.Infof(<span class="hljs-string">&quot;Error syncing pod %v: %v&quot;</span>, key, err)<br><br>		<span class="hljs-comment">// Re-enqueue the key rate limited. Based on the rate limiter on the</span><br>		<span class="hljs-comment">// queue and the re-enqueue history, the key will be processed later again.</span><br>		c.queue.AddRateLimited(key)<br>		<span class="hljs-keyword">return</span><br>	&#125;<br><br>	c.queue.Forget(key)<br>	<span class="hljs-comment">// Report to an external entity that, even after several retries, we could not successfully process this key</span><br>	runtime.HandleError(err)<br>	klog.Infof(<span class="hljs-string">&quot;Dropping pod %q out of the queue: %v&quot;</span>, key, err)<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p><code>queue.AddRateLimted(key)</code> 表示 <strong>过一段时间</strong> 将当前 key重新写入 <code>workqueue</code> 里，同时累计当前key的重试次数, 如果重试多次（当前示例为5次）仍失败的话，则调用 <code>runtime.HandleError(err)</code> 处理。</p>
+<p><code>c.queue.Forget</code> 表示一旦key完成，则清除其重试记录，避免影响下次重试，可以看出来 <code>Forget</code> 是对重试行为的处理，这个与 <code>c.queue.Done()</code> 的作用是不一样的。</p>
+<p>至此整个架构图中的每个步骤我们基本介绍完了，对于部分细节问题可能还需要花一些时间进行消化。</p>
+<h1 id="SharedInformer"><a href="#SharedInformer" class="headerlink" title="SharedInformer"></a>SharedInformer</h1><p>如果在一个应用中有多处相互独立的业务逻辑都需要监控同一种资源对象，用户会编写多个 <code>Informer</code> 来进行处理。这会导致应用中发起对 K8s <code>API Server</code> 同一资源的多次 <code>ListAndWatch</code> 调用，并且每一个 <code>Informer</code> 中都有一份单独的本地缓存，增加了内存占用。</p>
+<p>K8s 在 <code>client go</code> 中基于 <code>Informer</code> 之上再次做了一层封装，提供了 <code>SharedInformer</code> 机制。采用 <code>SharedInformer</code> 后，客户端对同一种资源对象只会有一个对 <code>API Server</code> 的 <code>ListAndWatch</code> 调用，多个 <code>Informer</code> 也会共用同一份缓存，减少了对 <code>API Server</code> 的请求，提高了性能。</p>
+<p>而对 <code>SharedInformer</code> 对象的获取一般是通过 <em><code>SharedInformerFactory</code></em> 工厂模式来获取</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// SharedInformerFactory provides shared informers for resources in all known</span><br><span class="hljs-comment">// API group versions.</span><br></code></pre></td></tr></table></figure>
+
+<p>在内部通过调用 <code>InformerFor()</code> 方法从 <code>cache</code> 中获取某一资源对应的 <code>Informer</code>，如果缓存中不存在，则需要通过指定的函数先创建并加入缓存，然后返回。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// client-go/informers/factory.go#L1870-L208</span><br><span class="hljs-comment">// InternalInformerFor returns the SharedIndexInformer for obj using an internal client.</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(f *sharedInformerFactory)</span></span> InformerFor(obj runtime.Object, newFunc internalinterfaces.NewInformerFunc) cache.SharedIndexInformer &#123;<br>	f.lock.Lock()<br>	<span class="hljs-keyword">defer</span> f.lock.Unlock()<br><br>	informerType := reflect.TypeOf(obj)<br>	informer, exists := f.informers[informerType]<br>	<span class="hljs-keyword">if</span> exists &#123;<br>		<span class="hljs-keyword">return</span> informer<br>	&#125;<br><br>	resyncPeriod, exists := f.customResync[informerType]<br>	<span class="hljs-keyword">if</span> !exists &#123;<br>		resyncPeriod = f.defaultResync<br>	&#125;<br><br>	informer = newFunc(f.client, resyncPeriod)<br>	f.informers[informerType] = informer<br><br>	<span class="hljs-keyword">return</span> informer<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>这里所谓的 <code>cache</code> 其实就是一个 <code>map</code> 对象。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-keyword">type</span> sharedInformerFactory <span class="hljs-keyword">struct</span> &#123;<br>        informers <span class="hljs-keyword">map</span>[reflect.Type]cache.SharedIndexInformer<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>对于自定义控制器开发，即可以直接选择使用 <a target="_blank" rel="noopener" href="https://github.com/kubernetes-sigs/controller-runtime">Controller Runtime</a> (<a target="_blank" rel="noopener" href="https://github.com/kubernetes-sigs/controller-runtime/blob/main/examples/README.md">官方Example</a>)库开发，也可以基于 <a target="_blank" rel="noopener" href="https://github.com/operator-framework/operator-sdk">Operator SDK</a>. 开发，还可以基于 <a target="_blank" rel="noopener" href="https://book.kubebuilder.io/">kubebuilder</a> 开发框架，其中后两者都会使用 Controller Runtime 库，而 kubebuiler 作为一款开发框架，由于其对开发者极其友好，因此是目前最优先的考虑，参考  <a target="_blank" rel="noopener" href="https://book.kubebuilder.io/quick-start.html">Kubebuilder’s Quick Start</a> 了解其用法。</p>
+<p><strong><code>CRD</code> 、<code>CR</code> 和 <code>控制器</code> 的区别</strong><img src="https://blogstatic.haohtml.com/uploads/2023/08/d2b5ca33bd970f64a6301fa75ae2eb22-1.png" srcset="/img/loading.gif" lazyload alt="img"></p>
+<p><code>CRD</code> 用于定义自定义资源类型, 如果程序开发中定义的类对象，脱离了控制器没有任何意义； <code>CR</code> （Custom Resource）是 <code>CRD</code> 定义的资源的实例化对象，是用户自定义的资源类型的具体实例，类似于根据类实例化了一个对象。<img src="https://blogstatic.haohtml.com/uploads/2023/08/d2b5ca33bd970f64a6301fa75ae2eb22-2.png" srcset="/img/loading.gif" lazyload alt="img"></p>
+<p><code>自定义控制器</code> 用于管理和控制<code>CRD</code>所定义的自定义资源的行为，类似于 <code>针对实例化对象</code> 的一些基本信息做出相应的动作或行为（实现期望状态与实际状态一致）的控制器。</p>
+<h1 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h1><p>在Kubernetes开发中，<code>client-go</code> 和 <code>Informers</code> 是两个密切相关的概念。</p>
+<p><code>client-go</code> 是 Kubernetes 官方提供的Go语言客户端库，用于与 <code>Kubernetes API</code> 进行通信。它封装了对 <code>Kubernetes API</code> 的各种操作，包括创建、获取、更新和删除资源等，提供了一组简单易用的API接口，方便开发人员进行与Kubernetes集群的交互。</p>
+<p>而 <code>Informers</code> 是 <code>client-go</code> 库中的一部分，它是一种实现了缓存和事件通知机制的机制。<code>Informers</code> 通过监听 Kubernetes <code>API Server</code>上的资源变更事件，将这些事件转换为相应的通知，提供给开发人员使用。这样，开发人员就可以在自己的应用程序中使用Informers来获取最新的资源信息，并进行相应的操作。</p>
+<p>使用 <code>Informers</code> 的好处是，避免了频繁地向 Kubernetes <code>API Server</code> 发送请求来获取最新的资源信息，而是通过缓存和事件通知来获取并同步资源的变更。这样可以减轻Kubernetes <code>API Server</code> 的负担，提高应用程序的性能和效率。</p>
+<p>因此，可以说 <code>client-go</code> 是Kubernetes开发中与 <code>API Server</code> 进行交互的核心组件，而<code>Informers</code> 是 <code>client-go</code> 的一部分，提供了缓存和事件通知的机制，方便开发人员使用。在使用 <code>client-go</code> 进行Kubernetes开发时，可以选择是否使用 <code>Informers</code> 来获取最新的资源信息。</p>
+<h1 id="参考文章"><a href="#参考文章" class="headerlink" title="参考文章"></a><strong>参考文章</strong></h1><ul>
+<li><a target="_blank" rel="noopener" href="https://github.com/kubernetes-sigs/controller-runtime/blob/main/examples/README.md">https://github.com/kubernetes-sigs/controller-runtime/blob/main/examples/README.md</a></li>
+<li><a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/42076">深入解析声明式API（二）：编写自定义控制器</a></li>
+<li><a target="_blank" rel="noopener" href="https://blog.csdn.net/weixin_37546425/article/details/118758066">kubebuilder之一：kubernetes operator工作原理</a></li>
+<li><a target="_blank" rel="noopener" href="https://www.cnblogs.com/charlieroro/p/10330390.html">kubernetes client-go解析</a></li>
+<li><a target="_blank" rel="noopener" href="https://hliangzhao.cn/articles/000001640262318a67c149f524b43a6b2796c4ae753cf2b000">自定义资源对象与控制器的实现</a></li>
+<li><a target="_blank" rel="noopener" href="https://so.csdn.net/so/search?q=%E6%B7%B1%E5%85%A5%E6%B5%85%E5%87%BAkubernetes%E4%B9%8Bclient-go&t=blog&u=weixin_42663840">深入浅出kubernetes之client-go</a></li>
+<li><a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s/TyA1bNXLQs1mXzZbw2PHfw?vid=1688850245817352&deviceid=6239469c-f992-42d3-a9b7-4313801e1c91&version=4.1.3.6008&platform=win">Kubernetes Controller 机制详解（一）</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/kubernetes/kubernetes/blob/master/staging/README.md">官方所有依赖仓库清单</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/kubernetes-sigs/kubebuilder">https://github.com/kubernetes-sigs/kubebuilder</a></li>
+</ul>
+
+                
+              </div>
+            
+            <hr/>
+            <div>
+              <div class="post-metas my-3">
+  
+  
+    <div class="post-meta">
+      <i class="iconfont icon-tags"></i>
+      
+        <a href="/tags/k8s/" class="print-no-link">#k8s</a>
+      
+    </div>
+  
+</div>
+
+
+              
+  
+
+  <div class="license-box my-3">
+    <div class="license-title">
+      <div>kubernetes之client-go之informer工作原理源码解析</div>
+      <div>http://guy-18.github.io/2025/04/03/kubernetes之client-go之informer工作原理源码解析/</div>
+    </div>
+    <div class="license-meta">
+      
+        <div class="license-meta-item">
+          <div>作者</div>
+          <div>John</div>
+        </div>
+      
+      
+        <div class="license-meta-item license-meta-date">
+          <div>发布于</div>
+          <div>2025年4月3日</div>
+        </div>
+      
+      
+      
+        <div class="license-meta-item">
+          <div>许可协议</div>
+          <div>
+            
+              
+              
+                <a class="print-no-link" target="_blank" href="https://creativecommons.org/licenses/by/4.0/">
+                  <span class="hint--top hint--rounded" aria-label="BY - 署名">
+                    <i class="iconfont icon-cc-by"></i>
+                  </span>
+                </a>
+              
+            
+          </div>
+        </div>
+      
+    </div>
+    <div class="license-icon iconfont"></div>
+  </div>
+
+
+
+              
+                <div class="post-prevnext my-3">
+                  <article class="post-prev col-6">
+                    
+                    
+                  </article>
+                  <article class="post-next col-6">
+                    
+                    
+                      <a href="/2025/04/02/Client-go%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E4%B9%8BListerWatcher/" title="Client-go源码分析之ListerWatcher">
+                        <span class="hidden-mobile">Client-go源码分析之ListerWatcher</span>
+                        <span class="visible-mobile">下一篇</span>
+                        <i class="iconfont icon-arrowright"></i>
+                      </a>
+                    
+                  </article>
+                </div>
+              
+            </div>
+
+            
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+  <aside class="sidebar" style="margin-left: -1rem">
+    <div id="toc">
+  <p class="toc-header">
+    <i class="iconfont icon-list"></i>
+    <span>目录</span>
+  </p>
+  <div class="toc-body" id="toc-body"></div>
+</div>
+
+
+
+  </aside>
+
+
+    </div>
+  </div>
+</div>
+
+
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+
+
+
+
+    
+
+    
+      <a id="scroll-top-button" aria-label="TOP" href="#" role="button">
+        <i class="iconfont icon-arrowup" aria-hidden="true"></i>
+      </a>
+    
+
+    
+      <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header text-center">
+        <h4 class="modal-title w-100 font-weight-bold">搜索</h4>
+        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body mx-3">
+        <div class="md-form mb-5">
+          <input type="text" id="local-search-input" class="form-control validate">
+          <label data-error="x" data-success="v" for="local-search-input">关键词</label>
+        </div>
+        <div class="list-group" id="local-search-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+    
+
+    
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+  
+    <div class="footer-content">
+       <a href="https://hexo.io" target="_blank" rel="nofollow noopener"><span>Hexo</span></a> <i class="iconfont icon-love"></i> <a href="https://github.com/fluid-dev/hexo-theme-fluid" target="_blank" rel="nofollow noopener"><span>Fluid</span></a> 
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+
+  <!-- Scripts -->
+  
+  <script  src="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.js" ></script>
+  <link  rel="stylesheet" href="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.css" />
+
+  <script>
+    NProgress.configure({"showSpinner":false,"trickleSpeed":100})
+    NProgress.start()
+    window.addEventListener('load', function() {
+      NProgress.done();
+    })
+  </script>
+
+
+<script  src="https://lib.baomitu.com/jquery/3.6.4/jquery.min.js" ></script>
+<script  src="https://lib.baomitu.com/twitter-bootstrap/4.6.1/js/bootstrap.min.js" ></script>
+<script  src="/js/events.js" ></script>
+<script  src="/js/plugins.js" ></script>
+
+
+  <script  src="https://lib.baomitu.com/typed.js/2.0.12/typed.min.js" ></script>
+  <script>
+    (function (window, document) {
+      var typing = Fluid.plugins.typing;
+      var subtitle = document.getElementById('subtitle');
+      if (!subtitle || !typing) {
+        return;
+      }
+      var text = subtitle.getAttribute('data-typed-text');
+      
+        typing(text);
+      
+    })(window, document);
+  </script>
+
+
+
+
+  
+    <script  src="/js/img-lazyload.js" ></script>
+  
+
+
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/tocbot/4.20.1/tocbot.min.js', function() {
+    var toc = jQuery('#toc');
+    if (toc.length === 0 || !window.tocbot) { return; }
+    var boardCtn = jQuery('#board-ctn');
+    var boardTop = boardCtn.offset().top;
+
+    window.tocbot.init(Object.assign({
+      tocSelector     : '#toc-body',
+      contentSelector : '.markdown-body',
+      linkClass       : 'tocbot-link',
+      activeLinkClass : 'tocbot-active-link',
+      listClass       : 'tocbot-list',
+      isCollapsedClass: 'tocbot-is-collapsed',
+      collapsibleClass: 'tocbot-is-collapsible',
+      scrollSmooth    : true,
+      includeTitleTags: true,
+      headingsOffset  : -boardTop,
+    }, CONFIG.toc));
+    if (toc.find('.toc-list-item').length > 0) {
+      toc.css('visibility', 'visible');
+    }
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('tocbot' in window) {
+        tocbot.refresh();
+        var toc = jQuery('#toc');
+        if (toc.length === 0 || !tocbot) {
+          return;
+        }
+        if (toc.find('.toc-list-item').length > 0) {
+          toc.css('visibility', 'visible');
+        }
+      }
+    });
+  });
+</script>
+
+
+  <script src=https://lib.baomitu.com/clipboard.js/2.0.11/clipboard.min.js></script>
+
+  <script>Fluid.plugins.codeWidget();</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/anchor-js/5.0.0/anchor.min.js', function() {
+    window.anchors.options = {
+      placement: CONFIG.anchorjs.placement,
+      visible  : CONFIG.anchorjs.visible
+    };
+    if (CONFIG.anchorjs.icon) {
+      window.anchors.options.icon = CONFIG.anchorjs.icon;
+    }
+    var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+    var res = [];
+    for (var item of el) {
+      res.push('.markdown-body > ' + item.trim());
+    }
+    if (CONFIG.anchorjs.placement === 'left') {
+      window.anchors.options.class = 'anchorjs-link-left';
+    }
+    window.anchors.add(res.join(', '));
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('anchors' in window) {
+        anchors.removeAll();
+        var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+        var res = [];
+        for (var item of el) {
+          res.push('.markdown-body > ' + item.trim());
+        }
+        if (CONFIG.anchorjs.placement === 'left') {
+          anchors.options.class = 'anchorjs-link-left';
+        }
+        anchors.add(res.join(', '));
+      }
+    });
+  });
+</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.js', function() {
+    Fluid.plugins.fancyBox();
+  });
+</script>
+
+
+  <script>Fluid.plugins.imageCaption();</script>
+
+  <script  src="/js/local-search.js" ></script>
+
+
+
+
+
+<!-- 主题的启动项，将它保持在最底部 -->
+<!-- the boot of the theme, keep it at the bottom -->
+<script  src="/js/boot.js" ></script>
+
+
+  
+
+  <noscript>
+    <div class="noscript-warning">博客在允许 JavaScript 运行的环境下浏览效果更佳</div>
+  </noscript>
+</body>
+</html>

@@ -1,0 +1,656 @@
+
+
+<!DOCTYPE html>
+<html lang="zh-CN" data-default-color-scheme=auto>
+
+
+
+<head>
+  <meta charset="UTF-8">
+
+  <link rel="apple-touch-icon" sizes="76x76" href="/img/fluid.png">
+  <link rel="icon" href="/img/fluid.png">
+  
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, shrink-to-fit=no">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  
+  <meta name="theme-color" content="#2f4154">
+  <meta name="author" content="John">
+  <meta name="keywords" content="">
+  
+    <meta name="description" content="一 背景kubernetes所有API对象都存储在etcd中，并只能通过apiserver访问。如果很多客户端频繁的列举全量对象（比如列举所有的Pod），这会造成apiserver不堪重负。 ListerWatcher是Lister和Watcher的结合体，ListerWatcher负责列举全量对象，Watcher负责监视（本文将watch翻译为监视）对象的增量变化。 通过客户端缓存，至在没有任何">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Client-go源码分析之ListerWatcher">
+<meta property="og:url" content="http://guy-18.github.io/2025/04/02/Client-go%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E4%B9%8BListerWatcher/index.html">
+<meta property="og:site_name" content="John的博客">
+<meta property="og:description" content="一 背景kubernetes所有API对象都存储在etcd中，并只能通过apiserver访问。如果很多客户端频繁的列举全量对象（比如列举所有的Pod），这会造成apiserver不堪重负。 ListerWatcher是Lister和Watcher的结合体，ListerWatcher负责列举全量对象，Watcher负责监视（本文将watch翻译为监视）对象的增量变化。 通过客户端缓存，至在没有任何">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://guy-18.github.io/2025/04/02/Client-go%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E4%B9%8BListerWatcher/20220120151429.png">
+<meta property="og:image" content="http://guy-18.github.io/2025/04/02/Client-go%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E4%B9%8BListerWatcher/20220120153657.png">
+<meta property="article:published_time" content="2025-04-02T13:42:49.000Z">
+<meta property="article:modified_time" content="2025-04-02T13:45:15.468Z">
+<meta property="article:author" content="John">
+<meta property="article:tag" content="k8s">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="http://guy-18.github.io/2025/04/02/Client-go%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E4%B9%8BListerWatcher/20220120151429.png">
+  
+  
+  
+  <title>Client-go源码分析之ListerWatcher - John的博客</title>
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/twitter-bootstrap/4.6.1/css/bootstrap.min.css" />
+
+
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/github-markdown-css/4.0.0/github-markdown.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/hint.css/2.7.0/hint.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.css" />
+
+
+
+<!-- 主题依赖的图标库，不要自行修改 -->
+<!-- Do not modify the link that theme dependent icons -->
+
+<link rel="stylesheet" href="//at.alicdn.com/t/c/font_1749284_5i9bdhy70f8.css">
+
+
+
+<link rel="stylesheet" href="//at.alicdn.com/t/c/font_1736178_k526ubmyhba.css">
+
+
+<link  rel="stylesheet" href="/css/main.css" />
+
+
+  <link id="highlight-css" rel="stylesheet" href="/css/highlight.css" />
+  
+    <link id="highlight-css-dark" rel="stylesheet" href="/css/highlight-dark.css" />
+  
+
+
+
+
+  <script id="fluid-configs">
+    var Fluid = window.Fluid || {};
+    Fluid.ctx = Object.assign({}, Fluid.ctx)
+    var CONFIG = {"hostname":"guy-18.github.io","root":"/","version":"1.9.8","typing":{"enable":true,"typeSpeed":70,"cursorChar":"_","loop":false,"scope":[]},"anchorjs":{"enable":true,"element":"h1,h2,h3,h4,h5,h6","placement":"left","visible":"hover","icon":""},"progressbar":{"enable":true,"height_px":3,"color":"#29d","options":{"showSpinner":false,"trickleSpeed":100}},"code_language":{"enable":true,"default":"TEXT"},"copy_btn":true,"image_caption":{"enable":true},"image_zoom":{"enable":true,"img_url_replace":["",""]},"toc":{"enable":true,"placement":"right","headingSelector":"h1,h2,h3,h4,h5,h6","collapseDepth":0},"lazyload":{"enable":true,"loading_img":"/img/loading.gif","onlypost":false,"offset_factor":2},"web_analytics":{"enable":false,"follow_dnt":true,"baidu":null,"google":{"measurement_id":null},"tencent":{"sid":null,"cid":null},"leancloud":{"app_id":null,"app_key":null,"server_url":null,"path":"window.location.pathname","ignore_local":false},"umami":{"src":null,"website_id":null,"domains":null,"start_time":"2024-01-01T00:00:00.000Z","token":null,"api_server":null}},"search_path":"/local-search.xml","include_content_in_search":true};
+
+    if (CONFIG.web_analytics.follow_dnt) {
+      var dntVal = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+      Fluid.ctx.dnt = dntVal && (dntVal.startsWith('1') || dntVal.startsWith('yes') || dntVal.startsWith('on'));
+    }
+  </script>
+  <script  src="/js/utils.js" ></script>
+  <script  src="/js/color-schema.js" ></script>
+  
+
+
+  
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+
+<body>
+  
+
+  <header>
+    
+
+<div class="header-inner" style="height: 70vh;">
+  <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
+  <div class="container">
+    <a class="navbar-brand" href="/">
+      <strong>Fluid</strong>
+    </a>
+
+    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
+            data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <div class="animated-icon"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Collapsible content -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ml-auto text-center">
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/" target="_self">
+                <i class="iconfont icon-home-fill"></i>
+                <span>首页</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/archives/" target="_self">
+                <i class="iconfont icon-archive-fill"></i>
+                <span>归档</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/categories/" target="_self">
+                <i class="iconfont icon-category-fill"></i>
+                <span>分类</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/tags/" target="_self">
+                <i class="iconfont icon-tags-fill"></i>
+                <span>标签</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/about/" target="_self">
+                <i class="iconfont icon-user-fill"></i>
+                <span>关于</span>
+              </a>
+            </li>
+          
+        
+        
+          <li class="nav-item" id="search-btn">
+            <a class="nav-link" target="_self" href="javascript:;" data-toggle="modal" data-target="#modalSearch" aria-label="Search">
+              <i class="iconfont icon-search"></i>
+            </a>
+          </li>
+          
+        
+        
+          <li class="nav-item" id="color-toggle-btn">
+            <a class="nav-link" target="_self" href="javascript:;" aria-label="Color Toggle">
+              <i class="iconfont icon-dark" id="color-toggle-icon"></i>
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+  
+
+<div id="banner" class="banner" parallax=true
+     style="background: url('/img/default.png') no-repeat center center; background-size: cover;">
+  <div class="full-bg-img">
+    <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
+      <div class="banner-text text-center fade-in-up">
+        <div class="h2">
+          
+            <span id="subtitle" data-typed-text="Client-go源码分析之ListerWatcher"></span>
+          
+        </div>
+
+        
+          
+  <div class="mt-3">
+    
+    
+      <span class="post-meta">
+        <i class="iconfont icon-date-fill" aria-hidden="true"></i>
+        <time datetime="2025-04-02 21:42" pubdate>
+          2025年4月2日 晚上
+        </time>
+      </span>
+    
+  </div>
+
+  <div class="mt-1">
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-chart"></i>
+        
+          1.7k 字
+        
+      </span>
+    
+
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-clock-fill"></i>
+        
+        
+        
+          15 分钟
+        
+      </span>
+    
+
+    
+    
+  </div>
+
+
+        
+      </div>
+
+      
+    </div>
+  </div>
+</div>
+
+</div>
+
+  </header>
+
+  <main>
+    
+      
+
+<div class="container-fluid nopadding-x">
+  <div class="row nomargin-x">
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+
+    </div>
+
+    <div class="col-lg-8 nopadding-x-md">
+      <div class="container nopadding-x-md" id="board-ctn">
+        <div id="board">
+          <article class="post-content mx-auto">
+            <h1 id="seo-header">Client-go源码分析之ListerWatcher</h1>
+            
+            
+              <div class="markdown-body">
+                
+                <h2 id="一-背景"><a href="#一-背景" class="headerlink" title="一 背景"></a>一 背景</h2><p>kubernetes所有API对象都存储在etcd中，并只能通过apiserver访问。如果很多客户端频繁的列举全量对象（比如列举所有的Pod），这会造成apiserver不堪重负。</p>
+<p>ListerWatcher是Lister和Watcher的结合体，ListerWatcher负责列举全量对象，Watcher负责监视（本文将watch翻译为监视）对象的增量变化。</p>
+<p>通过客户端缓存，至在没有任何状态变化的情况下只需要读取本地缓存即可，减少对API-server的压力效率提升显而易见。通过列举全量对象完成本地缓存，而监视增量则是为了及时的将apiserver的状态变化更新到本地缓存。所以，在apiserver与客户端之间绝大部分传输的是对象的增量变化，当然在异常的情况下还是要重新列举一次全量对象。</p>
+<p>本文值得客户端本地缓存就是Indexer，client-go不仅实现了缓存，同时还加了索引，进一步提升了检索效率。</p>
+<h2 id="二-ListerWatcher"><a href="#二-ListerWatcher" class="headerlink" title="二 ListerWatcher"></a>二 ListerWatcher</h2><p>Kubernetes 控制面 (control plane) 的核心是 **API 服务器 (API server)**。API 服务器负责提供 HTTP API，以供用户，集群中的不同部分和集群外部组件相互通信。控制器也不例外，所有控制器都通过 API 获取集群的当前状态，也通过 API 对集群状态进行修改。</p>
+<p>list-watch，作为k8s系统中统一的异步消息传递方式，对系统的性能、数据一致性起到关键性的作用。</p>
+<p><img src="/2025/04/02/Client-go%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E4%B9%8BListerWatcher/20220120151429.png" srcset="/img/loading.gif" lazyload alt="img"></p>
+<p>值得一提的是，Kubernetes 提供了 watch 机制方便客户端实时获取集群状态，有了这个接口，控制器才得以无延迟（准确地说是低延迟）地对状态变更作出响应。这里指的 “状态变更”，就是我们常说的**事件 (event)**。</p>
+<h3 id="2-1-EventType"><a href="#2-1-EventType" class="headerlink" title="2.1 EventType"></a>2.1 EventType</h3><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// EventType defines the possible types of events.</span><br><span class="hljs-keyword">type</span> EventType <span class="hljs-type">string</span><br><br><span class="hljs-keyword">const</span> (<br>	Added    EventType = <span class="hljs-string">&quot;ADDED&quot;</span><br>	Modified EventType = <span class="hljs-string">&quot;MODIFIED&quot;</span><br>	Deleted  EventType = <span class="hljs-string">&quot;DELETED&quot;</span><br>	Bookmark EventType = <span class="hljs-string">&quot;BOOKMARK&quot;</span><br>	Error    EventType = <span class="hljs-string">&quot;ERROR&quot;</span><br>)<br></code></pre></td></tr></table></figure>
+
+<h3 id="2-2-ListerWatcher定义"><a href="#2-2-ListerWatcher定义" class="headerlink" title="2.2 ListerWatcher定义"></a>2.2 ListerWatcher定义</h3><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// 复制代码</span><br><span class="hljs-comment">// client-go/tools/cache/listwatch.go</span><br><span class="hljs-comment">// Lister is any object that knows how to perform an initial list.</span><br><span class="hljs-keyword">type</span> Lister <span class="hljs-keyword">interface</span> &#123;<br>	<span class="hljs-comment">// List should return a list type object; the Items field will be extracted, and the</span><br>	<span class="hljs-comment">// ResourceVersion field will be used to start the watch in the right place.</span><br>	List(options metav1.ListOptions) (runtime.Object, <span class="hljs-type">error</span>)<br>&#125;<br><br><span class="hljs-comment">// Watcher is any object that knows how to start a watch on a resource.</span><br><span class="hljs-keyword">type</span> Watcher <span class="hljs-keyword">interface</span> &#123;<br>	<span class="hljs-comment">// Watch should begin a watch at the specified version.</span><br>	Watch(options metav1.ListOptions) (watch.Interface, <span class="hljs-type">error</span>)<br>&#125;<br><br><span class="hljs-comment">// ListerWatcher is any object that knows how to perform an initial list and start a watch on a resource.</span><br><span class="hljs-keyword">type</span> ListerWatcher <span class="hljs-keyword">interface</span> &#123;<br>	Lister<br>	Watcher<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<h3 id="2-3-创建ListWatcher对象"><a href="#2-3-创建ListWatcher对象" class="headerlink" title="2.3 创建ListWatcher对象"></a>2.3 创建ListWatcher对象</h3><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// NewListWatchFromClient creates a new ListWatch from the specified client, resource, namespace and field selector.</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">NewListWatchFromClient</span><span class="hljs-params">(c Getter, resource <span class="hljs-type">string</span>, namespace <span class="hljs-type">string</span>, fieldSelector fields.Selector)</span></span> *ListWatch &#123;<br>	optionsModifier := <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">(options *metav1.ListOptions)</span></span> &#123;<br>		options.FieldSelector = fieldSelector.String()<br>	&#125;<br>	<span class="hljs-keyword">return</span> NewFilteredListWatchFromClient(c, resource, namespace, optionsModifier)<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<h2 id="三-小试牛刀"><a href="#三-小试牛刀" class="headerlink" title="三 小试牛刀"></a>三 小试牛刀</h2><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><code class="hljs shell"><span class="hljs-meta prompt_">$ </span><span class="language-bash">kubectl proxy</span><br><span class="hljs-meta prompt_"># </span><span class="language-bash">进行listwatch default名称空间下的pods</span><br><span class="hljs-meta prompt_">$ </span><span class="language-bash">curl <span class="hljs-string">&quot;127.0.0.1:8001/api/v1/namespaces/default/pods?watch=1&quot;</span></span><br><span class="hljs-meta prompt_"># </span><span class="language-bash">创建pod进行观察</span><br><span class="hljs-meta prompt_">$ </span><span class="language-bash">kubectl run nginx --image=nginx</span><br>&#123;&quot;type&quot;:&quot;ADDED&quot;,&quot;object&quot;:&#123;&quot;kind&quot;:&quot;Pod&quot;,&quot;apiVersion&quot;:&quot;v1&quot;,&quot;metadata&quot;:&#123;&quot;name&quot;:&quot;nginx&quot;,&quot;namespace&quot;:&quot;default&quot;,&quot;uid&quot;:&quot;8d0548ce-fb67-4b71-93ec-59ad67b429d9&quot;,&quot;resourceVersion&quot;:&quot;2925331&quot;,&quot;creationTimestamp&quot;:&quot;2022-01-20T07:32:22Z&quot;,&quot;labels&quot;:&#123;&quot;run&quot;:&quot;nginx&quot;&#125;,&quot;managedFields&quot;:[&#123;&quot;manager&quot;:&quot;kubectl-run&quot;,&quot;operation&quot;:&quot;Update&quot;,&quot;apiVersion&quot;:&quot;v1&quot;,&quot;time&quot;:&quot;2022-01-20T07:32:22Z&quot;,&quot;fieldsType&quot;:&quot;FieldsV1&quot;,&quot;fieldsV1&quot;:&#123;&quot;f:metadata&quot;:&#123;&quot;f:labels&quot;:&#123;&quot;.&quot;:&#123;&#125;,&quot;f:run&quot;:&#123;&#125;&#125;&#125;,&quot;f:spec&quot;:&#123;&quot;f:containers&quot;:&#123;&quot;k:&#123;\&quot;name\&quot;:\&quot;nginx\&quot;&#125;&quot;:&#123;&quot;.&quot;:&#123;&#125;,&quot;f:image&quot;:&#123;&#125;,&quot;f:imagePullPolicy&quot;:&#123;&#125;,&quot;f:name&quot;:&#123;&#125;,&quot;f:resources&quot;:&#123;&#125;,&quot;f:terminationMessagePath&quot;:&#123;&#125;,&quot;f:terminationMessagePolicy&quot;:&#123;&#125;&#125;&#125;,&quot;f:dnsPolicy&quot;:&#123;&#125;,&quot;f:enableServiceLinks&quot;:&#123;&#125;,&quot;f:restartPolicy&quot;:&#123;&#125;,&quot;f:schedulerName&quot;:&#123;&#125;,&quot;f:securityContext&quot;:&#123;&#125;,&quot;f:terminationGracePeriodSeconds&quot;:&#123;&#125;&#125;&#125;&#125;]&#125;,&quot;spec&quot;:&#123;&quot;volumes&quot;:[&#123;&quot;name&quot;:&quot;kube-api-access-nc5v8&quot;,&quot;projected&quot;:&#123;&quot;sources&quot;:[&#123;&quot;serviceAccountToken&quot;:&#123;&quot;expirationSeconds&quot;:3607,&quot;path&quot;:&quot;token&quot;&#125;&#125;,&#123;&quot;configMap&quot;:&#123;&quot;name&quot;:&quot;kube-root-ca.crt&quot;,&quot;items&quot;:[&#123;&quot;key&quot;:&quot;ca.crt&quot;,&quot;path&quot;:&quot;ca.crt&quot;&#125;]&#125;&#125;,&#123;&quot;downwardAPI&quot;:&#123;&quot;items&quot;:[&#123;&quot;path&quot;:&quot;namespace&quot;,&quot;fieldRef&quot;:&#123;&quot;apiVersion&quot;:&quot;v1&quot;,&quot;fieldPath&quot;:&quot;metadata.namespace&quot;&#125;&#125;]&#125;&#125;],&quot;defaultMode&quot;:420&#125;&#125;],&quot;containers&quot;:[&#123;&quot;name&quot;:&quot;nginx&quot;,&quot;image&quot;:&quot;nginx&quot;,&quot;resources&quot;:&#123;&#125;,&quot;volumeMounts&quot;:[&#123;&quot;name&quot;:&quot;kube-api-access-nc5v8&quot;,&quot;readOnly&quot;:true,&quot;mountPath&quot;:&quot;/var/run/secrets/kubernetes.io/serviceaccount&quot;&#125;],&quot;terminationMessagePath&quot;:&quot;/dev/termination-log&quot;,&quot;terminationMessagePolicy&quot;:&quot;File&quot;,&quot;imagePullPolicy&quot;:&quot;Always&quot;&#125;],&quot;restartPolicy&quot;:&quot;Always&quot;,&quot;terminationGracePeriodSeconds&quot;:30,&quot;dnsPolicy&quot;:&quot;ClusterFirst&quot;,&quot;serviceAccountName&quot;:&quot;default&quot;,&quot;serviceAccount&quot;:&quot;default&quot;,&quot;securityContext&quot;:&#123;&#125;,&quot;schedulerName&quot;:&quot;default-scheduler&quot;,&quot;tolerations&quot;:[&#123;&quot;key&quot;:&quot;node.kubernetes.io/not-ready&quot;,&quot;operator&quot;:&quot;Exists&quot;,&quot;effect&quot;:&quot;NoExecute&quot;,&quot;tolerationSeconds&quot;:300&#125;,&#123;&quot;key&quot;:&quot;node.kubernetes.io/unreachable&quot;,&quot;operator&quot;:&quot;Exists&quot;,&quot;effect&quot;:&quot;NoExecute&quot;,&quot;tolerationSeconds&quot;:300&#125;],&quot;priority&quot;:0,&quot;enableServiceLinks&quot;:true,&quot;preemptionPolicy&quot;:&quot;PreemptLowerPriority&quot;&#125;,&quot;status&quot;:&#123;&quot;phase&quot;:&quot;Pending&quot;,&quot;qosClass&quot;:&quot;BestEffort&quot;&#125;&#125;&#125;<br></code></pre></td></tr></table></figure>
+
+<h2 id="四-代码实现"><a href="#四-代码实现" class="headerlink" title="四 代码实现"></a>四 代码实现</h2><p>编写代码对default名称空间下的configmap进行list watch。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-keyword">package</span> main<br><br><span class="hljs-keyword">import</span> (<br>	<span class="hljs-string">&quot;fmt&quot;</span><br>	v1 <span class="hljs-string">&quot;k8s.io/api/core/v1&quot;</span><br>	<span class="hljs-string">&quot;k8s.io/apimachinery/pkg/api/meta&quot;</span><br>	metav1 <span class="hljs-string">&quot;k8s.io/apimachinery/pkg/apis/meta/v1&quot;</span><br>	<span class="hljs-string">&quot;k8s.io/apimachinery/pkg/fields&quot;</span><br>	<span class="hljs-string">&quot;k8s.io/client-go/kubernetes&quot;</span><br>	<span class="hljs-string">&quot;k8s.io/client-go/tools/cache&quot;</span><br>	<span class="hljs-string">&quot;k8s.io/client-go/tools/clientcmd&quot;</span><br>	<span class="hljs-string">&quot;k8s.io/client-go/util/homedir&quot;</span><br>	<span class="hljs-string">&quot;os&quot;</span><br>	<span class="hljs-string">&quot;os/signal&quot;</span><br>	<span class="hljs-string">&quot;path/filepath&quot;</span><br>)<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">Must</span><span class="hljs-params">(e <span class="hljs-keyword">interface</span>&#123;&#125;)</span></span> &#123;<br>	<span class="hljs-keyword">if</span> e != <span class="hljs-literal">nil</span> &#123;<br>		<span class="hljs-built_in">panic</span>(e)<br>	&#125;<br>&#125;<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">InitClientSet</span><span class="hljs-params">()</span></span> (*kubernetes.Clientset, <span class="hljs-type">error</span>) &#123;<br>	kubeconfig := filepath.Join(homedir.HomeDir(), <span class="hljs-string">&quot;.kube&quot;</span>, <span class="hljs-string">&quot;config&quot;</span>)<br>	restConfig, err := clientcmd.BuildConfigFromFlags(<span class="hljs-string">&quot;&quot;</span>, kubeconfig)<br>	<span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<br>		<span class="hljs-keyword">return</span> <span class="hljs-literal">nil</span>, err<br>	&#125;<br>	<span class="hljs-keyword">return</span> kubernetes.NewForConfig(restConfig)<br>&#125;<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">InitListerWatcher</span><span class="hljs-params">(clientSet *kubernetes.Clientset, resource, namespace <span class="hljs-type">string</span>, fieldSelector fields.Selector)</span></span> cache.ListerWatcher &#123;<br>	restClient := clientSet.CoreV1().RESTClient()<br>	<span class="hljs-keyword">return</span> cache.NewListWatchFromClient(restClient, resource, namespace, fieldSelector)<br>&#125;<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">main</span><span class="hljs-params">()</span></span> &#123;<br>	clientSet, err := InitClientSet()<br>	<span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<br>		<span class="hljs-built_in">panic</span>(err)<br>	&#125;<br><br>	<span class="hljs-comment">// 什么常量</span><br>	resource := <span class="hljs-string">&quot;configmaps&quot;</span><br>	namespace := <span class="hljs-string">&quot;default&quot;</span><br><br>	configMapListerWatcher := InitListerWatcher(clientSet, resource, namespace, fields.Everything())<br><br>	<span class="hljs-comment">// 1. list操作</span><br>	listObj, err := configMapListerWatcher.List(metav1.ListOptions&#123;&#125;)<br><br>	<span class="hljs-comment">// meta 包封装了一些处理 runtime.Object 对象的方法，屏蔽了反射和类型转换的过程，</span><br>	<span class="hljs-comment">// 提取出的 items 类型为 []runtime.Object</span><br>	items, err := meta.ExtractList(listObj)<br>	<span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<br>		Must(err)<br>	&#125;<br>	fmt.Println(<span class="hljs-string">&quot;list result:&quot;</span>)<br>	<span class="hljs-keyword">for</span> _, item := <span class="hljs-keyword">range</span> items &#123;<br>		configmaps, ok := item.(*v1.ConfigMap)<br>		<span class="hljs-keyword">if</span> !ok &#123;<br>			<span class="hljs-keyword">return</span><br>		&#125;<br>		fmt.Printf(<span class="hljs-string">&quot;namespace: %s, resource name:%s\n&quot;</span>, configmaps.Namespace, configmaps.Name)<br>	&#125;<br><br>	<span class="hljs-comment">// 2. watch 操作</span><br>	listMetaInterface, err := meta.ListAccessor(listObj)<br>	<span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<br>		Must(err)<br>	&#125;<br>	resourceVersion := listMetaInterface.GetResourceVersion()<br><br>	watchObj, err := configMapListerWatcher.Watch(metav1.ListOptions&#123;<br>		ResourceVersion: resourceVersion,<br>	&#125;)<br><br>	<span class="hljs-comment">// 接收信号</span><br>	stopCh := <span class="hljs-built_in">make</span>(<span class="hljs-keyword">chan</span> os.Signal)<br>	signal.Notify(stopCh, os.Interrupt)<br>	fmt.Println(<span class="hljs-string">&quot;Start watching...&quot;</span>)<br>	<span class="hljs-keyword">for</span> &#123;<br>		<span class="hljs-keyword">select</span> &#123;<br>		<span class="hljs-keyword">case</span> &lt;-stopCh:<br>			fmt.Println(<span class="hljs-string">&quot;exit&quot;</span>)<br>			<span class="hljs-keyword">return</span><br>		<span class="hljs-keyword">case</span> event, ok := &lt;-watchObj.ResultChan():<br>			<span class="hljs-keyword">if</span> !ok &#123;<br>				fmt.Println(<span class="hljs-string">&quot;Broken channel&quot;</span>)<br>				<span class="hljs-keyword">break</span><br>			&#125;<br>			configmaps, ok := event.Object.(*v1.ConfigMap)<br>			<span class="hljs-keyword">if</span> !ok &#123;<br>				<span class="hljs-keyword">return</span><br>			&#125;<br>			fmt.Printf(<span class="hljs-string">&quot;eventType: %s, watch obj:%s\n&quot;</span>, event.Type, configmaps.Name)<br>		&#125;<br>	&#125;<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>进行创建configmap测试</p>
+<p><img src="/2025/04/02/Client-go%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E4%B9%8BListerWatcher/20220120153657.png" srcset="/img/loading.gif" lazyload alt="img"></p>
+<h2 id="五-总结"><a href="#五-总结" class="headerlink" title="五 总结"></a>五 总结</h2><ul>
+<li>ListerWatcher就是为SharedIndexInformer列举全量对象、监视对象增量变化设计的接口，实现就是Clientset的List和Watch函数；</li>
+<li>SharedIndexInformer利用ListerWatcher实现了本地缓存与apiserver之间的状态一致性；</li>
+<li>不仅可以提升客户端访问API对象的效率，同时可以将对象的增量变化回调给使用者；</li>
+<li>从原理上讲，可以用etcd的clientv3.Client实现ListerWatcher，SharedIndexInformer同步etcd的对象，这样一些简单的醒目就可以复用SharedIndexInformer了，毕竟不是所有的项目都需要一个apiserver；</li>
+</ul>
+
+                
+              </div>
+            
+            <hr/>
+            <div>
+              <div class="post-metas my-3">
+  
+  
+    <div class="post-meta">
+      <i class="iconfont icon-tags"></i>
+      
+        <a href="/tags/k8s/" class="print-no-link">#k8s</a>
+      
+    </div>
+  
+</div>
+
+
+              
+  
+
+  <div class="license-box my-3">
+    <div class="license-title">
+      <div>Client-go源码分析之ListerWatcher</div>
+      <div>http://guy-18.github.io/2025/04/02/Client-go源码分析之ListerWatcher/</div>
+    </div>
+    <div class="license-meta">
+      
+        <div class="license-meta-item">
+          <div>作者</div>
+          <div>John</div>
+        </div>
+      
+      
+        <div class="license-meta-item license-meta-date">
+          <div>发布于</div>
+          <div>2025年4月2日</div>
+        </div>
+      
+      
+      
+        <div class="license-meta-item">
+          <div>许可协议</div>
+          <div>
+            
+              
+              
+                <a class="print-no-link" target="_blank" href="https://creativecommons.org/licenses/by/4.0/">
+                  <span class="hint--top hint--rounded" aria-label="BY - 署名">
+                    <i class="iconfont icon-cc-by"></i>
+                  </span>
+                </a>
+              
+            
+          </div>
+        </div>
+      
+    </div>
+    <div class="license-icon iconfont"></div>
+  </div>
+
+
+
+              
+                <div class="post-prevnext my-3">
+                  <article class="post-prev col-6">
+                    
+                    
+                      <a href="/2025/04/03/kubernetes%E4%B9%8Bclient-go%E4%B9%8Binformer%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90/" title="kubernetes之client-go之informer工作原理源码解析">
+                        <i class="iconfont icon-arrowleft"></i>
+                        <span class="hidden-mobile">kubernetes之client-go之informer工作原理源码解析</span>
+                        <span class="visible-mobile">上一篇</span>
+                      </a>
+                    
+                  </article>
+                  <article class="post-next col-6">
+                    
+                    
+                      <a href="/2025/04/01/Golang%E4%B8%AD%E7%9A%84Defer%E5%BF%85%E6%8E%8C%E6%8F%A1%E7%9A%847%E7%9F%A5%E8%AF%86%E7%82%B9/" title="Golang中的Defer必掌握的7知识点">
+                        <span class="hidden-mobile">Golang中的Defer必掌握的7知识点</span>
+                        <span class="visible-mobile">下一篇</span>
+                        <i class="iconfont icon-arrowright"></i>
+                      </a>
+                    
+                  </article>
+                </div>
+              
+            </div>
+
+            
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+  <aside class="sidebar" style="margin-left: -1rem">
+    <div id="toc">
+  <p class="toc-header">
+    <i class="iconfont icon-list"></i>
+    <span>目录</span>
+  </p>
+  <div class="toc-body" id="toc-body"></div>
+</div>
+
+
+
+  </aside>
+
+
+    </div>
+  </div>
+</div>
+
+
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+
+
+
+
+    
+
+    
+      <a id="scroll-top-button" aria-label="TOP" href="#" role="button">
+        <i class="iconfont icon-arrowup" aria-hidden="true"></i>
+      </a>
+    
+
+    
+      <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header text-center">
+        <h4 class="modal-title w-100 font-weight-bold">搜索</h4>
+        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body mx-3">
+        <div class="md-form mb-5">
+          <input type="text" id="local-search-input" class="form-control validate">
+          <label data-error="x" data-success="v" for="local-search-input">关键词</label>
+        </div>
+        <div class="list-group" id="local-search-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+    
+
+    
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+  
+    <div class="footer-content">
+       <a href="https://hexo.io" target="_blank" rel="nofollow noopener"><span>Hexo</span></a> <i class="iconfont icon-love"></i> <a href="https://github.com/fluid-dev/hexo-theme-fluid" target="_blank" rel="nofollow noopener"><span>Fluid</span></a> 
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+
+  <!-- Scripts -->
+  
+  <script  src="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.js" ></script>
+  <link  rel="stylesheet" href="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.css" />
+
+  <script>
+    NProgress.configure({"showSpinner":false,"trickleSpeed":100})
+    NProgress.start()
+    window.addEventListener('load', function() {
+      NProgress.done();
+    })
+  </script>
+
+
+<script  src="https://lib.baomitu.com/jquery/3.6.4/jquery.min.js" ></script>
+<script  src="https://lib.baomitu.com/twitter-bootstrap/4.6.1/js/bootstrap.min.js" ></script>
+<script  src="/js/events.js" ></script>
+<script  src="/js/plugins.js" ></script>
+
+
+  <script  src="https://lib.baomitu.com/typed.js/2.0.12/typed.min.js" ></script>
+  <script>
+    (function (window, document) {
+      var typing = Fluid.plugins.typing;
+      var subtitle = document.getElementById('subtitle');
+      if (!subtitle || !typing) {
+        return;
+      }
+      var text = subtitle.getAttribute('data-typed-text');
+      
+        typing(text);
+      
+    })(window, document);
+  </script>
+
+
+
+
+  
+    <script  src="/js/img-lazyload.js" ></script>
+  
+
+
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/tocbot/4.20.1/tocbot.min.js', function() {
+    var toc = jQuery('#toc');
+    if (toc.length === 0 || !window.tocbot) { return; }
+    var boardCtn = jQuery('#board-ctn');
+    var boardTop = boardCtn.offset().top;
+
+    window.tocbot.init(Object.assign({
+      tocSelector     : '#toc-body',
+      contentSelector : '.markdown-body',
+      linkClass       : 'tocbot-link',
+      activeLinkClass : 'tocbot-active-link',
+      listClass       : 'tocbot-list',
+      isCollapsedClass: 'tocbot-is-collapsed',
+      collapsibleClass: 'tocbot-is-collapsible',
+      scrollSmooth    : true,
+      includeTitleTags: true,
+      headingsOffset  : -boardTop,
+    }, CONFIG.toc));
+    if (toc.find('.toc-list-item').length > 0) {
+      toc.css('visibility', 'visible');
+    }
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('tocbot' in window) {
+        tocbot.refresh();
+        var toc = jQuery('#toc');
+        if (toc.length === 0 || !tocbot) {
+          return;
+        }
+        if (toc.find('.toc-list-item').length > 0) {
+          toc.css('visibility', 'visible');
+        }
+      }
+    });
+  });
+</script>
+
+
+  <script src=https://lib.baomitu.com/clipboard.js/2.0.11/clipboard.min.js></script>
+
+  <script>Fluid.plugins.codeWidget();</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/anchor-js/5.0.0/anchor.min.js', function() {
+    window.anchors.options = {
+      placement: CONFIG.anchorjs.placement,
+      visible  : CONFIG.anchorjs.visible
+    };
+    if (CONFIG.anchorjs.icon) {
+      window.anchors.options.icon = CONFIG.anchorjs.icon;
+    }
+    var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+    var res = [];
+    for (var item of el) {
+      res.push('.markdown-body > ' + item.trim());
+    }
+    if (CONFIG.anchorjs.placement === 'left') {
+      window.anchors.options.class = 'anchorjs-link-left';
+    }
+    window.anchors.add(res.join(', '));
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('anchors' in window) {
+        anchors.removeAll();
+        var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+        var res = [];
+        for (var item of el) {
+          res.push('.markdown-body > ' + item.trim());
+        }
+        if (CONFIG.anchorjs.placement === 'left') {
+          anchors.options.class = 'anchorjs-link-left';
+        }
+        anchors.add(res.join(', '));
+      }
+    });
+  });
+</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.js', function() {
+    Fluid.plugins.fancyBox();
+  });
+</script>
+
+
+  <script>Fluid.plugins.imageCaption();</script>
+
+  <script  src="/js/local-search.js" ></script>
+
+
+
+
+
+<!-- 主题的启动项，将它保持在最底部 -->
+<!-- the boot of the theme, keep it at the bottom -->
+<script  src="/js/boot.js" ></script>
+
+
+  
+
+  <noscript>
+    <div class="noscript-warning">博客在允许 JavaScript 运行的环境下浏览效果更佳</div>
+  </noscript>
+</body>
+</html>
