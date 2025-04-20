@@ -27,7 +27,7 @@
 <meta property="og:description" content="Go 为什么对slice append时，要用原来的变量来接收s &#x3D; append(s, 1)  因为append是一个函数，函数的传参是值拷贝，传进去的s在函数内部已经是另一个s了，而函数外部原来的s.len并不会被改变，所以要用函数返回的新s来覆盖原来的s go内存管理go协程原理go并发编程go网络编程 gin框架 context包 channel底层原理 实现M:N生产者消费者模">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2024-12-05T13:40:40.000Z">
-<meta property="article:modified_time" content="2025-04-02T16:40:02.488Z">
+<meta property="article:modified_time" content="2025-04-14T14:38:04.285Z">
 <meta property="article:author" content="John">
 <meta name="twitter:card" content="summary_large_image">
   
@@ -222,7 +222,7 @@
       <span class="post-meta mr-2">
         <i class="iconfont icon-chart"></i>
         
-          176 字
+          234 字
         
       </span>
     
@@ -286,7 +286,9 @@
 <p>实现M:N生产者消费者模型，双方均设置超时5s丢弃机制</p>
 <p>实现高并发阻塞式Map</p>
 <p>sync.Cond</p>
-<p>sync.Once</p>
+<p>sync.Once<br>sync.Map原理</p>
+<p>go协程如何退出的</p>
+<p>make和new的区别</p>
 <h2 id="Linux"><a href="#Linux" class="headerlink" title="Linux"></a>Linux</h2><p>namespace</p>
 <p>cgroups</p>
 <h1 id><a href="#" class="headerlink" title></a></h1><h2 id="Git"><a href="#Git" class="headerlink" title="Git"></a>Git</h2><h2 id="k8s"><a href="#k8s" class="headerlink" title="k8s"></a>k8s</h2><p>list-watch 底层原理</p>
@@ -296,6 +298,11 @@
 <p>drain</p>
 <p>kube-apiserver 缓存机制</p>
 <p>etcd</p>
+<p>pod都有哪些状态</p>
+<p>分布式训练</p>
+<p>tensorflow如何支持分布式训练</p>
+<p>如何使用docker进行机器学习训练</p>
+<p>如何使用k8s进行机器学习训练</p>
 <h2 id="网络"><a href="#网络" class="headerlink" title="网络"></a>网络</h2><p>socket编程</p>
 <h2 id="前端"><a href="#前端" class="headerlink" title="前端"></a>前端</h2><h2 id="算法题"><a href="#算法题" class="headerlink" title="算法题"></a>算法题</h2>
                 

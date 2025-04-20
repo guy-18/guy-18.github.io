@@ -1,0 +1,751 @@
+
+
+<!DOCTYPE html>
+<html lang="zh-CN" data-default-color-scheme=auto>
+
+
+
+<head>
+  <meta charset="UTF-8">
+
+  <link rel="apple-touch-icon" sizes="76x76" href="/img/fluid.png">
+  <link rel="icon" href="/img/fluid.png">
+  
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, shrink-to-fit=no">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  
+  <meta name="theme-color" content="#2f4154">
+  <meta name="author" content="John">
+  <meta name="keywords" content="">
+  
+    <meta name="description" content="metrics-server源码解读转自：https:&#x2F;&#x2F;yost.top&#x2F;2020&#x2F;05&#x2F;17&#x2F;about-metric-server&#x2F; 1、项目概况项目地址：https:&#x2F;&#x2F;github.com&#x2F;kubernetes-sigs&#x2F;metrics-server 在k8s集群中，如果你想要去做弹性伸缩，或者想要使用kubectl top命令，那么metric-server是你绕不开的组件。metri">
+<meta property="og:type" content="article">
+<meta property="og:title" content="metrics-server源码解读">
+<meta property="og:url" content="http://guy-18.github.io/2025/04/08/metrics-server%E6%BA%90%E7%A0%81%E8%A7%A3%E8%AF%BB/index.html">
+<meta property="og:site_name" content="John的博客">
+<meta property="og:description" content="metrics-server源码解读转自：https:&#x2F;&#x2F;yost.top&#x2F;2020&#x2F;05&#x2F;17&#x2F;about-metric-server&#x2F; 1、项目概况项目地址：https:&#x2F;&#x2F;github.com&#x2F;kubernetes-sigs&#x2F;metrics-server 在k8s集群中，如果你想要去做弹性伸缩，或者想要使用kubectl top命令，那么metric-server是你绕不开的组件。metri">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2025-04-08T13:56:55.000Z">
+<meta property="article:modified_time" content="2025-04-08T14:01:27.583Z">
+<meta property="article:author" content="John">
+<meta property="article:tag" content="k8s">
+<meta name="twitter:card" content="summary_large_image">
+  
+  
+  
+  <title>metrics-server源码解读 - John的博客</title>
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/twitter-bootstrap/4.6.1/css/bootstrap.min.css" />
+
+
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/github-markdown-css/4.0.0/github-markdown.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/hint.css/2.7.0/hint.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.css" />
+
+
+
+<!-- 主题依赖的图标库，不要自行修改 -->
+<!-- Do not modify the link that theme dependent icons -->
+
+<link rel="stylesheet" href="//at.alicdn.com/t/c/font_1749284_5i9bdhy70f8.css">
+
+
+
+<link rel="stylesheet" href="//at.alicdn.com/t/c/font_1736178_k526ubmyhba.css">
+
+
+<link  rel="stylesheet" href="/css/main.css" />
+
+
+  <link id="highlight-css" rel="stylesheet" href="/css/highlight.css" />
+  
+    <link id="highlight-css-dark" rel="stylesheet" href="/css/highlight-dark.css" />
+  
+
+
+
+
+  <script id="fluid-configs">
+    var Fluid = window.Fluid || {};
+    Fluid.ctx = Object.assign({}, Fluid.ctx)
+    var CONFIG = {"hostname":"guy-18.github.io","root":"/","version":"1.9.8","typing":{"enable":true,"typeSpeed":70,"cursorChar":"_","loop":false,"scope":[]},"anchorjs":{"enable":true,"element":"h1,h2,h3,h4,h5,h6","placement":"left","visible":"hover","icon":""},"progressbar":{"enable":true,"height_px":3,"color":"#29d","options":{"showSpinner":false,"trickleSpeed":100}},"code_language":{"enable":true,"default":"TEXT"},"copy_btn":true,"image_caption":{"enable":true},"image_zoom":{"enable":true,"img_url_replace":["",""]},"toc":{"enable":true,"placement":"right","headingSelector":"h1,h2,h3,h4,h5,h6","collapseDepth":0},"lazyload":{"enable":true,"loading_img":"/img/loading.gif","onlypost":false,"offset_factor":2},"web_analytics":{"enable":false,"follow_dnt":true,"baidu":null,"google":{"measurement_id":null},"tencent":{"sid":null,"cid":null},"leancloud":{"app_id":null,"app_key":null,"server_url":null,"path":"window.location.pathname","ignore_local":false},"umami":{"src":null,"website_id":null,"domains":null,"start_time":"2024-01-01T00:00:00.000Z","token":null,"api_server":null}},"search_path":"/local-search.xml","include_content_in_search":true};
+
+    if (CONFIG.web_analytics.follow_dnt) {
+      var dntVal = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+      Fluid.ctx.dnt = dntVal && (dntVal.startsWith('1') || dntVal.startsWith('yes') || dntVal.startsWith('on'));
+    }
+  </script>
+  <script  src="/js/utils.js" ></script>
+  <script  src="/js/color-schema.js" ></script>
+  
+
+
+  
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+
+<body>
+  
+
+  <header>
+    
+
+<div class="header-inner" style="height: 70vh;">
+  <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
+  <div class="container">
+    <a class="navbar-brand" href="/">
+      <strong>Fluid</strong>
+    </a>
+
+    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
+            data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <div class="animated-icon"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Collapsible content -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ml-auto text-center">
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/" target="_self">
+                <i class="iconfont icon-home-fill"></i>
+                <span>首页</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/archives/" target="_self">
+                <i class="iconfont icon-archive-fill"></i>
+                <span>归档</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/categories/" target="_self">
+                <i class="iconfont icon-category-fill"></i>
+                <span>分类</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/tags/" target="_self">
+                <i class="iconfont icon-tags-fill"></i>
+                <span>标签</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/about/" target="_self">
+                <i class="iconfont icon-user-fill"></i>
+                <span>关于</span>
+              </a>
+            </li>
+          
+        
+        
+          <li class="nav-item" id="search-btn">
+            <a class="nav-link" target="_self" href="javascript:;" data-toggle="modal" data-target="#modalSearch" aria-label="Search">
+              <i class="iconfont icon-search"></i>
+            </a>
+          </li>
+          
+        
+        
+          <li class="nav-item" id="color-toggle-btn">
+            <a class="nav-link" target="_self" href="javascript:;" aria-label="Color Toggle">
+              <i class="iconfont icon-dark" id="color-toggle-icon"></i>
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+  
+
+<div id="banner" class="banner" parallax=true
+     style="background: url('/img/default.png') no-repeat center center; background-size: cover;">
+  <div class="full-bg-img">
+    <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
+      <div class="banner-text text-center fade-in-up">
+        <div class="h2">
+          
+            <span id="subtitle" data-typed-text="metrics-server源码解读"></span>
+          
+        </div>
+
+        
+          
+  <div class="mt-3">
+    
+    
+      <span class="post-meta">
+        <i class="iconfont icon-date-fill" aria-hidden="true"></i>
+        <time datetime="2025-04-08 21:56" pubdate>
+          2025年4月8日 晚上
+        </time>
+      </span>
+    
+  </div>
+
+  <div class="mt-1">
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-chart"></i>
+        
+          5.7k 字
+        
+      </span>
+    
+
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-clock-fill"></i>
+        
+        
+        
+          48 分钟
+        
+      </span>
+    
+
+    
+    
+  </div>
+
+
+        
+      </div>
+
+      
+    </div>
+  </div>
+</div>
+
+</div>
+
+  </header>
+
+  <main>
+    
+      
+
+<div class="container-fluid nopadding-x">
+  <div class="row nomargin-x">
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+
+    </div>
+
+    <div class="col-lg-8 nopadding-x-md">
+      <div class="container nopadding-x-md" id="board-ctn">
+        <div id="board">
+          <article class="post-content mx-auto">
+            <h1 id="seo-header">metrics-server源码解读</h1>
+            
+            
+              <div class="markdown-body">
+                
+                <h1 id="metrics-server源码解读"><a href="#metrics-server源码解读" class="headerlink" title="metrics-server源码解读"></a>metrics-server源码解读</h1><p>转自：<a target="_blank" rel="noopener" href="https://yost.top/2020/05/17/about-metric-server/">https://yost.top/2020/05/17/about-metric-server/</a></p>
+<h3 id="1、项目概况"><a href="#1、项目概况" class="headerlink" title="1、项目概况"></a>1、项目概况</h3><p>项目地址：<a target="_blank" rel="noopener" href="https://github.com/kubernetes-sigs/metrics-server">https://github.com/kubernetes-sigs/metrics-server</a></p>
+<p>在<code>k8s</code>集群中，如果你想要去做弹性伸缩，或者想要使用<code>kubectl top</code>命令，那么<code>metric-server</code>是你绕不开的组件。<code>metric-server</code>主要用来通过<code>aggregate api</code>向其它组件提供集群中的<code>pod</code>和<code>node</code>的<code>cpu</code>和<code>memory</code>的监控指标，弹性伸缩中的<code>podautoscaler</code>就是通过调用这个接口来查看pod的当前资源使用量来进行pod的扩缩容的。</p>
+<p>需要注意的是：</p>
+<ul>
+<li><code>metric-server</code>提供的是实时的指标（实际是最近一次采集的数据，保存在内存中），并没有数据库来存储</li>
+<li>这些数据指标并非由<code>metric-server</code>本身采集，而是由每个节点上的<code>cadvisor</code>采集，<code>metric-server</code>只是发请求给<code>cadvisor</code>并将<code>metric</code>格式的数据转换成<code>aggregate api</code></li>
+<li>由于需要通过<code>aggregate api</code>来提供接口，需要集群中的<code>kube-apiserver</code>开启该功能（开启方法可以参考官方社区的文档）</li>
+</ul>
+<h3 id="2、部署方法"><a href="#2、部署方法" class="headerlink" title="2、部署方法"></a>2、部署方法</h3><p><code>metric-server</code>最佳的安装方法是通过<code>deployment</code>：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs shell">kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.3.6/components.yaml<br></code></pre></td></tr></table></figure>
+
+<p>该<code>yaml</code>中主要的<code>deployment</code>参数如下：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br></pre></td><td class="code"><pre><code class="hljs yaml"><span class="hljs-attr">apiVersion:</span> <span class="hljs-string">apps/v1</span><br><span class="hljs-attr">kind:</span> <span class="hljs-string">Deployment</span><br><span class="hljs-attr">metadata:</span><br>  <span class="hljs-attr">name:</span> <span class="hljs-string">metrics-server</span><br>  <span class="hljs-attr">namespace:</span> <span class="hljs-string">kube-system</span><br>  <span class="hljs-attr">labels:</span><br>    <span class="hljs-attr">k8s-app:</span> <span class="hljs-string">metrics-server</span><br><span class="hljs-attr">spec:</span><br>  <span class="hljs-attr">selector:</span><br>    <span class="hljs-attr">matchLabels:</span><br>      <span class="hljs-attr">k8s-app:</span> <span class="hljs-string">metrics-server</span><br>  <span class="hljs-attr">template:</span><br>    <span class="hljs-attr">metadata:</span><br>      <span class="hljs-attr">name:</span> <span class="hljs-string">metrics-server</span><br>      <span class="hljs-attr">labels:</span><br>        <span class="hljs-attr">k8s-app:</span> <span class="hljs-string">metrics-server</span><br>    <span class="hljs-attr">spec:</span><br>      <span class="hljs-attr">serviceAccountName:</span> <span class="hljs-string">metrics-server</span><br>      <span class="hljs-attr">volumes:</span><br>      <span class="hljs-comment"># mount in tmp so we can safely use from-scratch images and/or read-only containers</span><br>      <span class="hljs-bullet">-</span> <span class="hljs-attr">name:</span> <span class="hljs-string">tmp-dir</span><br>        <span class="hljs-attr">emptyDir:</span> &#123;&#125;<br>      <span class="hljs-attr">containers:</span><br>      <span class="hljs-bullet">-</span> <span class="hljs-attr">name:</span> <span class="hljs-string">metrics-server</span><br>        <span class="hljs-attr">image:</span> <span class="hljs-string">k8s.gcr.io/metrics-server-amd64:v0.3.6</span><br>        <span class="hljs-attr">imagePullPolicy:</span> <span class="hljs-string">IfNotPresent</span><br>        <span class="hljs-attr">args:</span><br>          <span class="hljs-bullet">-</span> <span class="hljs-string">--cert-dir=/tmp</span><br>          <span class="hljs-bullet">-</span> <span class="hljs-string">--secure-port=4443</span><br>        <span class="hljs-attr">ports:</span><br>        <span class="hljs-bullet">-</span> <span class="hljs-attr">name:</span> <span class="hljs-string">main-port</span><br>          <span class="hljs-attr">containerPort:</span> <span class="hljs-number">4443</span><br>          <span class="hljs-attr">protocol:</span> <span class="hljs-string">TCP</span><br>        <span class="hljs-attr">securityContext:</span><br>          <span class="hljs-attr">readOnlyRootFilesystem:</span> <span class="hljs-literal">true</span><br>          <span class="hljs-attr">runAsNonRoot:</span> <span class="hljs-literal">true</span><br>          <span class="hljs-attr">runAsUser:</span> <span class="hljs-number">1000</span><br>        <span class="hljs-attr">volumeMounts:</span><br>        <span class="hljs-bullet">-</span> <span class="hljs-attr">name:</span> <span class="hljs-string">tmp-dir</span><br>          <span class="hljs-attr">mountPath:</span> <span class="hljs-string">/tmp</span><br>      <span class="hljs-attr">nodeSelector:</span><br>        <span class="hljs-attr">kubernetes.io/os:</span> <span class="hljs-string">linux</span><br>        <span class="hljs-attr">kubernetes.io/arch:</span> <span class="hljs-string">&quot;amd64&quot;</span><br></code></pre></td></tr></table></figure>
+
+<p>其中还有一个值得注意的资源是一个<code>APIService</code>，这个资源主要就是将<code>metrics-server</code>注册到<code>aggregate api</code>中。</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><code class="hljs yaml"><span class="hljs-attr">apiVersion:</span> <span class="hljs-string">apiregistration.k8s.io/v1beta1</span><br><span class="hljs-attr">kind:</span> <span class="hljs-string">APIService</span><br><span class="hljs-attr">metadata:</span><br>  <span class="hljs-attr">name:</span> <span class="hljs-string">v1beta1.metrics.k8s.io</span><br><span class="hljs-attr">spec:</span><br>  <span class="hljs-attr">service:</span><br>    <span class="hljs-attr">name:</span> <span class="hljs-string">metrics-server</span><br>    <span class="hljs-attr">namespace:</span> <span class="hljs-string">kube-system</span><br>  <span class="hljs-attr">group:</span> <span class="hljs-string">metrics.k8s.io</span><br>  <span class="hljs-attr">version:</span> <span class="hljs-string">v1beta1</span><br>  <span class="hljs-attr">insecureSkipTLSVerify:</span> <span class="hljs-literal">true</span><br>  <span class="hljs-attr">groupPriorityMinimum:</span> <span class="hljs-number">100</span><br>  <span class="hljs-attr">versionPriority:</span> <span class="hljs-number">100</span><br></code></pre></td></tr></table></figure>
+
+<h3 id="3、启动参数"><a href="#3、启动参数" class="headerlink" title="3、启动参数"></a>3、启动参数</h3><table>
+<thead>
+<tr>
+<th align="left">参数名称</th>
+<th align="left">参数解释</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">metric-resolution</td>
+<td align="left">周期性调用接口获取metric原始数据的时间间隔，默认60s</td>
+</tr>
+<tr>
+<td align="left">kubelet-insecure-tls</td>
+<td align="left">访问kubelet时不对其证书进行ca校验，仅测试时使用</td>
+</tr>
+<tr>
+<td align="left">kubelet-port</td>
+<td align="left">调用节点上的kubelet获取metric的端口，默认10250端口</td>
+</tr>
+<tr>
+<td align="left">kubeconfig</td>
+<td align="left">调用kube-apiserver和kubelet使用的kubeconfig文件路径</td>
+</tr>
+<tr>
+<td align="left">kubelet-preferred-address-types</td>
+<td align="left">调用kubelet使用的ip地址优先级</td>
+</tr>
+<tr>
+<td align="left">kubelet-certificate-authority</td>
+<td align="left">访问kubelet使用的ca证书</td>
+</tr>
+<tr>
+<td align="left">deprecated-kubelet-completely-insecure</td>
+<td align="left">使用非安全方式访问kubelet（即将废弃）</td>
+</tr>
+</tbody></table>
+<h3 id="4、代码分析"><a href="#4、代码分析" class="headerlink" title="4、代码分析"></a>4、代码分析</h3><p>在开始走读<code>metrics-server</code>的代码之前，我们先来根据其功能来猜测一下它的代码逻辑。我们知道，通过节点上的<code>cadvisor</code>接口获取到的数据一般是这样的，包含的信息太多：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br></pre></td><td class="code"><pre><code class="hljs shell">[root@node1 ~]# curl -k https://172.17.8.101:10250/stats/summary?only_cpu_and_memory=true<br>&#123;<br>  &quot;node&quot;: &#123;<br>    &quot;nodeName&quot;: &quot;node1&quot;,<br>    &quot;systemContainers&quot;: [<br>      &#123;<br>        &quot;name&quot;: &quot;kubelet&quot;,<br>        &quot;startTime&quot;: &quot;2020-05-24T12:54:13Z&quot;,<br>        &quot;cpu&quot;: &#123;<br>          &quot;time&quot;: &quot;2020-05-24T14:12:31Z&quot;,<br>          &quot;usageNanoCores&quot;: 20686133,<br>          &quot;usageCoreNanoSeconds&quot;: 156089526198<br>        &#125;,<br>        &quot;memory&quot;: &#123;<br>          &quot;time&quot;: &quot;2020-05-24T14:12:31Z&quot;,<br>          &quot;usageBytes&quot;: 170590208,<br>          &quot;workingSetBytes&quot;: 122531840,<br>          &quot;rssBytes&quot;: 66949120,<br>          &quot;pageFaults&quot;: 763727,<br>          &quot;majorPageFaults&quot;: 85<br>        &#125;,<br>        &quot;userDefinedMetrics&quot;: null<br>      &#125;,<br>      &#123;<br>        &quot;name&quot;: &quot;runtime&quot;,<br>        &quot;startTime&quot;: &quot;2020-05-24T12:54:13Z&quot;,<br>        &quot;cpu&quot;: &#123;<br>          &quot;time&quot;: &quot;2020-05-24T14:12:31Z&quot;,<br>          &quot;usageNanoCores&quot;: 20686133,<br>          &quot;usageCoreNanoSeconds&quot;: 156089526198<br>        &#125;,<br>        &quot;memory&quot;: &#123;<br>          &quot;time&quot;: &quot;2020-05-24T14:12:31Z&quot;,<br>          &quot;usageBytes&quot;: 170590208,<br>          &quot;workingSetBytes&quot;: 122531840,<br>          &quot;rssBytes&quot;: 66949120,<br>          &quot;pageFaults&quot;: 763727,<br>          &quot;majorPageFaults&quot;: 85<br>        &#125;,<br>        &quot;userDefinedMetrics&quot;: null<br>      &#125;,<br>      &#123;<br>        &quot;name&quot;: &quot;pods&quot;,<br>        &quot;startTime&quot;: &quot;2020-05-24T12:54:13Z&quot;,<br>        &quot;cpu&quot;: &#123;<br>          &quot;time&quot;: &quot;2020-05-24T14:12:39Z&quot;,<br>          &quot;usageNanoCores&quot;: 0,<br>          &quot;usageCoreNanoSeconds&quot;: 42207538504<br>        &#125;,<br>        &quot;memory&quot;: &#123;<br>          &quot;time&quot;: &quot;2020-05-24T14:12:39Z&quot;,<br>          &quot;availableBytes&quot;: 1910824960,<br>          &quot;usageBytes&quot;: 33480704,<br>          &quot;workingSetBytes&quot;: 16498688,<br>          &quot;rssBytes&quot;: 36864,<br>          &quot;pageFaults&quot;: 0,<br>          &quot;majorPageFaults&quot;: 0<br>        &#125;,<br>        &quot;userDefinedMetrics&quot;: null<br>      &#125;<br>    ],<br>    &quot;startTime&quot;: &quot;2020-05-24T12:52:24Z&quot;,<br>    &quot;cpu&quot;: &#123;<br>      &quot;time&quot;: &quot;2020-05-24T14:12:39Z&quot;,<br>      &quot;usageNanoCores&quot;: 888521168,<br>      &quot;usageCoreNanoSeconds&quot;: 776524490477<br>    &#125;,<br>    &quot;memory&quot;: &#123;<br>      &quot;time&quot;: &quot;2020-05-24T14:12:39Z&quot;,<br>      &quot;availableBytes&quot;: 891166720,<br>      &quot;usageBytes&quot;: 1627074560,<br>      &quot;workingSetBytes&quot;: 1036156928,<br>      &quot;rssBytes&quot;: 359944192,<br>      &quot;pageFaults&quot;: 1850284,<br>      &quot;majorPageFaults&quot;: 1987<br>    &#125;<br>  &#125;,<br>  &quot;pods&quot;: [<br>    &#123;<br>      &quot;podRef&quot;: &#123;<br>        &quot;name&quot;: &quot;metrics-server-7668599459-2jxq5&quot;,<br>        &quot;namespace&quot;: &quot;kube-system&quot;,<br>        &quot;uid&quot;: &quot;f5af876f-03de-43e5-902b-79bece68c508&quot;<br>      &#125;,<br>      &quot;startTime&quot;: &quot;2020-05-24T13:27:42Z&quot;,<br>      &quot;containers&quot;: null,<br>      &quot;cpu&quot;: &#123;<br>        &quot;time&quot;: &quot;2020-05-24T14:12:36Z&quot;,<br>        &quot;usageNanoCores&quot;: 0,<br>        &quot;usageCoreNanoSeconds&quot;: 6297886<br>      &#125;,<br>      &quot;memory&quot;: &#123;<br>        &quot;time&quot;: &quot;2020-05-24T14:12:36Z&quot;,<br>        &quot;usageBytes&quot;: 434176,<br>        &quot;workingSetBytes&quot;: 249856,<br>        &quot;rssBytes&quot;: 36864,<br>        &quot;pageFaults&quot;: 0,<br>        &quot;majorPageFaults&quot;: 0<br>      &#125;<br>    &#125;<br>  ]<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>而我们通过<code>metrics-server</code>获得的数据则是这样：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><code class="hljs shell">[root@node1 ~]# curl http://172.17.8.101:8080/apis/metrics.k8s.io/v1beta1/namespaces/kube-system/pods/metrics-server-7668599459-2jxq5<br>&#123;<br>  &quot;kind&quot;: &quot;PodMetrics&quot;,<br>  &quot;apiVersion&quot;: &quot;metrics.k8s.io/v1beta1&quot;,<br>  &quot;metadata&quot;: &#123;<br>    &quot;name&quot;: &quot;metrics-server-7668599459-2jxq5&quot;,<br>    &quot;namespace&quot;: &quot;kube-system&quot;,<br>    &quot;selfLink&quot;: &quot;/apis/metrics.k8s.io/v1beta1/namespaces/kube-system/pods/metrics-server-7668599459-2jxq5&quot;,<br>    &quot;creationTimestamp&quot;: &quot;2020-05-24T13:27:42Z&quot;<br>  &#125;,<br>  &quot;timeStamp&quot;: &quot;2020-05-24T13:27:42Z&quot;,<br>  &quot;window&quot;: &quot;30s&quot;,<br>  &quot;containers&quot;: [<br>    &#123;<br>      &quot;name&quot;: &quot;metrics-server&quot;,<br>      &quot;usage&quot;: &#123;<br>        &quot;cpu&quot;: &quot;0&quot;,<br>        &quot;memory&quot;: &quot;424Ki&quot;<br>      &#125;<br>    &#125;<br>  ]<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>也就是说，本质上<code>metrics-server</code>相当于做了一次数据的转换，把<code>cadvisor</code>格式的数据转换成了<code>k8s</code>的<code>api</code>的<code>json</code>格式。由此我们不难猜测，<code>metrics-server</code>的代码中必然存在这种先从metric中获取接口中的所有信息，再解析出其中的数据的过程。除此之外，我们可能也会有一个疑惑，那就是：我们给<code>metric-server</code>发送请求时，<code>metric-server</code>是马上向<code>cadvisor</code>发送请求然后解析请求中的数据再返回回来，还是<code>metrics-server</code>中已经定期从中<code>cadvisor</code>获取好数据了（可能缓存在内存中），当请求发过来时直接返回缓存中的数据。我们可以带着这个疑问直接去看源码。</p>
+<h4 id="4-1、启动程序"><a href="#4-1、启动程序" class="headerlink" title="4.1、启动程序"></a>4.1、启动程序</h4><p><code>metric-server</code>的启动流程使用的也是<code>github.com/spf13/cobra</code>框架，对这个库感兴趣的可以去<a target="_blank" rel="noopener" href="https://github.com/spf13/cobra"><code>github</code></a>上了解一下，该框架实际执行的是<code>MetricsServerOptions</code>实现的Run函数</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// cmd/metrics-server/app/start.go</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(o MetricsServerOptions)</span></span> Run(stopCh &lt;-<span class="hljs-keyword">chan</span> <span class="hljs-keyword">struct</span>&#123;&#125;) <span class="hljs-type">error</span> &#123;<br>	<span class="hljs-comment">// 1、生成metric-server自己的server端配置</span><br>	config, err := o.Config()<br>	<span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<br>		<span class="hljs-keyword">return</span> err<br>	&#125;<br>	config.GenericConfig.EnableMetrics = <span class="hljs-literal">true</span><br><br>	<span class="hljs-comment">// 2、生成metric-server自己的client端配置</span><br>    <span class="hljs-comment">// 包含对kube-apiserver的client（获取集群node信息）和对cadvisor的client（获取原始监控数据）</span><br>	<span class="hljs-keyword">var</span> clientConfig *rest.Config<br>	<span class="hljs-keyword">if</span> <span class="hljs-built_in">len</span>(o.Kubeconfig) &gt; <span class="hljs-number">0</span> &#123;<br>		loadingRules := &amp;clientcmd.ClientConfigLoadingRules&#123;ExplicitPath: o.Kubeconfig&#125;<br>		loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &amp;clientcmd.ConfigOverrides&#123;&#125;)<br>		clientConfig, err = loader.ClientConfig()<br>	&#125; <span class="hljs-keyword">else</span> &#123;<br>		clientConfig, err = rest.InClusterConfig()<br>	&#125;<br>	<span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<br>		<span class="hljs-keyword">return</span> fmt.Errorf(<span class="hljs-string">&quot;unable to construct lister client config: %v&quot;</span>, err)<br>	&#125;<br>	<span class="hljs-comment">// Use protobufs for communication with apiserver</span><br>	clientConfig.ContentType = <span class="hljs-string">&quot;application/vnd.kubernetes.protobuf&quot;</span><br><br>	<span class="hljs-comment">// 2.1、通过刚才的client配置参数创建kube-apiserver的client</span><br>	kubeClient, err := kubernetes.NewForConfig(clientConfig)<br>	<span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<br>		<span class="hljs-keyword">return</span> fmt.Errorf(<span class="hljs-string">&quot;unable to construct lister client: %v&quot;</span>, err)<br>	&#125;<br>	<span class="hljs-comment">// 根据client创建对应的informer，到这里与kuber-apiserver通信的部分就设置好了</span><br>	informerFactory := informers.NewSharedInformerFactory(kubeClient, <span class="hljs-number">0</span>)<br><br>	<span class="hljs-comment">// 2.2、这里开始创建与节点上的metric接口相关的client</span><br>	kubeletRestCfg := rest.CopyConfig(clientConfig)<br>	<span class="hljs-keyword">if</span> <span class="hljs-built_in">len</span>(o.KubeletCAFile) &gt; <span class="hljs-number">0</span> &#123;<br>		kubeletRestCfg.TLSClientConfig.CAFile = o.KubeletCAFile<br>		kubeletRestCfg.TLSClientConfig.CAData = <span class="hljs-literal">nil</span><br>	&#125;<br>	kubeletConfig := summary.GetKubeletConfig(kubeletRestCfg, o.KubeletPort, o.InsecureKubeletTLS, o.DeprecatedCompletelyInsecureKubelet)<br>	kubeletClient, err := summary.KubeletClientFor(kubeletConfig)<br>	<span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<br>		<span class="hljs-keyword">return</span> fmt.Errorf(<span class="hljs-string">&quot;unable to construct a client to connect to the kubelets: %v&quot;</span>, err)<br>	&#125;<br><br>	<span class="hljs-comment">// 设置访问node的ip的优先级（node中保存有各种address，包括InternalIP、ExternalIP等）</span><br>	addrPriority := <span class="hljs-built_in">make</span>([]corev1.NodeAddressType, <span class="hljs-built_in">len</span>(o.KubeletPreferredAddressTypes))<br>	<span class="hljs-keyword">for</span> i, addrType := <span class="hljs-keyword">range</span> o.KubeletPreferredAddressTypes &#123;<br>		addrPriority[i] = corev1.NodeAddressType(addrType)<br>	&#125;<br>	addrResolver := summary.NewPriorityNodeAddressResolver(addrPriority)<br>    <span class="hljs-comment">// sourceProvider是将前面的两个client合并到一起从cadvisor抓取数据</span><br>    <span class="hljs-comment">// informer负责获取集群中的节点相关的信息，kubeletClient则调用这些节点上的cadvisor接口</span><br>    <span class="hljs-comment">// 注意这里只传入了NodeLister，也就是是说只需要list node相关的信息就可以了</span><br>	sourceProvider := summary.NewSummaryProvider(informerFactory.Core().V1().Nodes().Lister(), kubeletClient, addrResolver)<br>	scrapeTimeout := time.Duration(<span class="hljs-type">float64</span>(o.MetricResolution) * <span class="hljs-number">0.90</span>) <span class="hljs-comment">// scrape timeout is 90% of the scrape interval</span><br>    <span class="hljs-comment">// 将抓取时间间隔放到本server的metric接口中，并创建一个sourceManager</span><br>	sources.RegisterDurationMetrics(scrapeTimeout)<br>	sourceManager := sources.NewSourceManager(sourceProvider, scrapeTimeout)<br><br>	<span class="hljs-comment">// 3、创建metricSink用来保存获取并解析出来的监控数据（仅保存在内存中）</span><br>    <span class="hljs-comment">//    需要注意的是，这里的metricSink和metricsProvider是同一个sinkMetricsProvider实例</span><br>	metricSink, metricsProvider := sink.NewSinkProvider()<br><br>	<span class="hljs-comment">// 4、创建一个Manager用来将前面的sourceProvider和metricSink管理起来，前者抓数据，后者存数据</span><br>	manager.RegisterDurationMetrics(o.MetricResolution)<br>	mgr := manager.NewManager(sourceManager, metricSink, o.MetricResolution)<br><br>	<span class="hljs-comment">// 1.1、将刚才的metricSink传入到server的配置中去，这样http server直接从metricSink中获取数据，然后直接返回给client就可以了，不需要再去调用cadvisor查metric数据</span><br>	config.ProviderConfig.Node = metricsProvider<br>	config.ProviderConfig.Pod = metricsProvider<br><br>	<span class="hljs-comment">// 1.2、通过config给将要启动的server做一些初始化的动作，同时也将informerFactory传进去</span><br>	server, err := config.Complete(informerFactory).New()<br>	<span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<br>		<span class="hljs-keyword">return</span> err<br>	&#125;<br><br>	<span class="hljs-comment">// add health checks</span><br>	server.AddHealthzChecks(healthz.NamedCheck(<span class="hljs-string">&quot;healthz&quot;</span>, mgr.CheckHealth))<br><br>	<span class="hljs-comment">// 5、将刚才的manager运行起来（调用cadvisor的接口获取并解析数据，然后存到metricSink中）</span><br>	mgr.RunUntil(stopCh)<br>    <span class="hljs-comment">// 1.3、根据1中的配置将metric-server启动起来</span><br>	<span class="hljs-keyword">return</span> server.GenericAPIServer.PrepareRun().Run(stopCh)<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>从这段代码中可以看出来，数据的抓取和缓存与<code>server</code>是两个不同的处理流程，他们之间通过共享内存来配合，数据定期抓取完之后缓存到<code>metricSink</code>（其实也就是<code>metricsProvider</code>）中，而<code>server</code>收到请求时从<code>metricSink</code>中读取数据并返回给<code>client</code>。这个过程也正好回答了我们之前的问题，<code>metrics-server</code>中已经定期从中<code>cadvisor</code>获取好数据了，当请求发过来时直接返回缓存中的数据。</p>
+<h4 id="4-2、数据抓取与缓存"><a href="#4-2、数据抓取与缓存" class="headerlink" title="4.2、数据抓取与缓存"></a>4.2、数据抓取与缓存</h4><p>4.1章节代码注释中的2&#x2F;3&#x2F;4&#x2F;5小节就是<code>metric-server</code>的数据抓取流程的启动过程，我们暂且称之为<code>manager</code>，我们看到这其中主要是起了两个<code>client</code>，一个是<code>kube-apiserver</code>的<code>client</code>用来获取集群中<code>node</code>资源，另一个client则是调用节点上<code>cadvisor</code>的接口获取节点和<code>pod</code>的<code>cpu</code>和<code>memory</code>监控数据，同时也创建了一个<code>metricSink</code>用来保存获取的监控数据。话不多说，我们来看一下这个<code>manager</code>是如何运转的。</p>
+<p>我们将4.1章节代码注释中的4和5连在一起就是<code>manager</code>的启动过程，创建一个<code>manager</code>然后运行起来。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><code class="hljs go">manager.RegisterDurationMetrics(o.MetricResolution)<br>mgr := manager.NewManager(sourceManager, metricSink, o.MetricResolution)<br><br>mgr.RunUntil(stopCh)<br></code></pre></td></tr></table></figure>
+
+<p>上面的启动过程实际如下，创建好的<code>manager</code>运行是其实就是周期性地执行其<code>Collect</code>函数。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// pkg/manager/manager.go</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">NewManager</span><span class="hljs-params">(metricSrc sources.MetricSource, metricSink sink.MetricSink, resolution time.Duration)</span></span> *Manager &#123;<br>	manager := Manager&#123;<br>		source:     metricSrc, <span class="hljs-comment">// 抓取metric的interface，需要实现Collect</span><br>		sink:       metricSink, <span class="hljs-comment">// 保存抓取数据的接收器，需要实现Receive</span><br>		resolution: resolution, <span class="hljs-comment">// 抓取metric的时间间隔</span><br>	&#125;<br><br>	<span class="hljs-keyword">return</span> &amp;manager<br>&#125;<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(rm *Manager)</span></span> RunUntil(stopCh &lt;-<span class="hljs-keyword">chan</span> <span class="hljs-keyword">struct</span>&#123;&#125;) &#123;<br>	<span class="hljs-keyword">go</span> <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">()</span></span> &#123;<br>        <span class="hljs-comment">// 创建一个周期性的定时器</span><br>		ticker := time.NewTicker(rm.resolution)<br>		<span class="hljs-keyword">defer</span> ticker.Stop()<br>		rm.Collect(time.Now())<br><br>		<span class="hljs-keyword">for</span> &#123;<br>			<span class="hljs-keyword">select</span> &#123;<br>            <span class="hljs-comment">// 周期性执行Collect</span><br>			<span class="hljs-keyword">case</span> startTime := &lt;-ticker.C:<br>				rm.Collect(startTime) <span class="hljs-comment">// 实际周期性执行的是这里的Collect函数</span><br>			<span class="hljs-keyword">case</span> &lt;-stopCh:<br>				<span class="hljs-keyword">return</span><br>			&#125;<br>		&#125;<br>	&#125;()<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>接下来看<code>Collect</code>函数中的逻辑就很简介明了了，主要做了两件事件：</p>
+<ul>
+<li>调用sourceManager实现的Collect函数获取metric数据</li>
+<li>将获取到的原始metric数据解析成pod和node的数值并保存metricSink中去</li>
+</ul>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(rm *Manager)</span></span> Collect(startTime time.Time) &#123;<br>	rm.healthMu.Lock()<br>	rm.lastTickStart = startTime<br>	rm.healthMu.Unlock()<br><br>	healthyTick := <span class="hljs-literal">true</span><br><br>    <span class="hljs-comment">// 给发request的context中设置超时时间为manager的检查周期</span><br>	ctx, cancelTimeout := context.WithTimeout(context.Background(), rm.resolution)<br>	<span class="hljs-keyword">defer</span> cancelTimeout()<br><br>	klog.V(<span class="hljs-number">6</span>).Infof(<span class="hljs-string">&quot;Beginning cycle, collecting metrics...&quot;</span>)<br>    <span class="hljs-comment">// 1、执行sourceManager实现的Collect函数获取metric数据</span><br>	data, collectErr := rm.source.Collect(ctx)<br>    <br>    <span class="hljs-comment">// 省略异常处理的逻辑</span><br><br>	klog.V(<span class="hljs-number">6</span>).Infof(<span class="hljs-string">&quot;...Storing metrics...&quot;</span>)<br>    <span class="hljs-comment">// 2、将获取到的原始metric数据保存到metricSink中去</span><br>	recvErr := rm.sink.Receive(data)<br>    <br>    <span class="hljs-comment">// 省略异常处理的逻辑</span><br><br>    <span class="hljs-comment">// 将实际的collect处理时间放到自己的metric接口中</span><br>	collectTime := time.Since(startTime)<br>	tickDuration.Observe(<span class="hljs-type">float64</span>(collectTime) / <span class="hljs-type">float64</span>(time.Second))<br>	klog.V(<span class="hljs-number">6</span>).Infof(<span class="hljs-string">&quot;...Cycle complete&quot;</span>)<br><br>	rm.healthMu.Lock()<br>	rm.lastOk = healthyTick<br>	rm.healthMu.Unlock()<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<h5 id="4-2-1、获取metric数据（rm-source-Collect-ctx-）"><a href="#4-2-1、获取metric数据（rm-source-Collect-ctx-）" class="headerlink" title="4.2.1、获取metric数据（rm.source.Collect(ctx)）"></a>4.2.1、获取<code>metric</code>数据（<code>rm.source.Collect(ctx)</code>）</h5><p>获取<code>metric</code>数据本质上就是调接口获取第4章节开头说的<code>/metric</code>格式的数据，而这个接口本质上就是k8s集群中节点上的<code>cadvisor</code>（实际由<code>kubelet</code>暴露），因此这部分的逻辑就是围绕这个思路展开。</p>
+<ul>
+<li>首先需要知道这个集群中有哪些节点，并获取这些节点上获取<code>metric</code>的<code>ip</code>和端口</li>
+<li>分别调用这些节点上的<code>metric</code>接口并解析其中<code>node</code>和<code>pod</code>的<code>cpu</code>和<code>memory</code>数值</li>
+</ul>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// pkg/sources/manager.go</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(m *sourceManager)</span></span> Collect(baseCtx context.Context) (*MetricsBatch, <span class="hljs-type">error</span>) &#123;<br>    <span class="hljs-comment">// 1、获取需要抓取数据的所有源头，即集群中节点上的cadvisor接口</span><br>	sources, err := m.srcProv.GetMetricSources()<br>	<span class="hljs-keyword">var</span> errs []<span class="hljs-type">error</span><br>	<span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<br>		errs = <span class="hljs-built_in">append</span>(errs, err)<br>	&#125;<br>	klog.V(<span class="hljs-number">1</span>).Infof(<span class="hljs-string">&quot;Scraping metrics from %v sources&quot;</span>, <span class="hljs-built_in">len</span>(sources))<br>    <span class="hljs-comment">// 创建接受数据和错误的channel</span><br>	responseChannel := <span class="hljs-built_in">make</span>(<span class="hljs-keyword">chan</span> *MetricsBatch, <span class="hljs-built_in">len</span>(sources))<br>	errChannel := <span class="hljs-built_in">make</span>(<span class="hljs-keyword">chan</span> <span class="hljs-type">error</span>, <span class="hljs-built_in">len</span>(sources))<br>	<span class="hljs-keyword">defer</span> <span class="hljs-built_in">close</span>(responseChannel)<br>	<span class="hljs-keyword">defer</span> <span class="hljs-built_in">close</span>(errChannel)<br>	startTime := time.Now()<br>	delayMs := delayPerSourceMs * <span class="hljs-built_in">len</span>(sources)<br>	<span class="hljs-keyword">if</span> delayMs &gt; maxDelayMs &#123;<br>		delayMs = maxDelayMs<br>	&#125;<br>	<span class="hljs-keyword">for</span> _, source := <span class="hljs-keyword">range</span> sources &#123;<br>        <span class="hljs-comment">// 2、分别起一个协程去调每个source的接口抓取数据，并写入到channel中</span><br>		<span class="hljs-keyword">go</span> <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">(source MetricSource)</span></span> &#123;<br>            <span class="hljs-comment">// 每个协程中随机sleep一段时间，防止几个协程同时发请求造成网络拥塞</span><br>			sleepDuration := time.Duration(rand.Intn(delayMs)) * time.Millisecond<br>			time.Sleep(sleepDuration)<br>			<span class="hljs-comment">// 超时时间减去刚才sleep的时间</span><br>			ctx, cancelTimeout := context.WithTimeout(baseCtx, m.scrapeTimeout-sleepDuration)<br>			<span class="hljs-keyword">defer</span> cancelTimeout()<br>			klog.V(<span class="hljs-number">2</span>).Infof(<span class="hljs-string">&quot;Querying source: %s&quot;</span>, source)<br>            <span class="hljs-comment">// 抓取数据</span><br>			metrics, err := scrapeWithMetrics(ctx, source)<br>			<span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<br>				err = fmt.Errorf(<span class="hljs-string">&quot;unable to fully scrape metrics from source %s: %v&quot;</span>, source.Name(), err)<br>			&#125;<br>			responseChannel &lt;- metrics<br>			errChannel &lt;- err<br>		&#125;(source)<br>	&#125;<br>	res := &amp;MetricsBatch&#123;&#125;<br>	<span class="hljs-keyword">for</span> <span class="hljs-keyword">range</span> sources &#123;<br>        <span class="hljs-comment">// 将抓取的数据分成node和pod的保存下来并返回</span><br>		err := &lt;-errChannel<br>		srcBatch := &lt;-responseChannel<br>		<span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<br>			errs = <span class="hljs-built_in">append</span>(errs, err)<br>		&#125;<br>		<span class="hljs-keyword">if</span> srcBatch == <span class="hljs-literal">nil</span> &#123;<br>			<span class="hljs-keyword">continue</span><br>		&#125;<br><br>		res.Nodes = <span class="hljs-built_in">append</span>(res.Nodes, srcBatch.Nodes...)<br>		res.Pods = <span class="hljs-built_in">append</span>(res.Pods, srcBatch.Pods...)<br>	&#125;<br><br>	klog.V(<span class="hljs-number">1</span>).Infof(<span class="hljs-string">&quot;ScrapeMetrics: time: %s, nodes: %v, pods: %v&quot;</span>, time.Since(startTime), <span class="hljs-built_in">len</span>(res.Nodes), <span class="hljs-built_in">len</span>(res.Pods))<br>	<span class="hljs-keyword">return</span> res, utilerrors.NewAggregate(errs)<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>可以看到上述两个关键点的细节都封装起来了，我们一个一个来看：</p>
+<ol>
+<li><h6 id="获取源头m-srcProv-GetMetricSources"><a href="#获取源头m-srcProv-GetMetricSources" class="headerlink" title="获取源头m.srcProv.GetMetricSources()"></a>获取源头<code>m.srcProv.GetMetricSources()</code></h6><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// pkg/sources/summary/summary.go</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(p *summaryProvider)</span></span> GetMetricSources() ([]sources.MetricSource, <span class="hljs-type">error</span>) &#123;<br>	sources := []sources.MetricSource&#123;&#125;<br>    <span class="hljs-comment">// 调用k8s接口List所有节点的信息</span><br>	nodes, err := p.nodeLister.List(labels.Everything())<br>	<span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<br>		<span class="hljs-keyword">return</span> <span class="hljs-literal">nil</span>, fmt.Errorf(<span class="hljs-string">&quot;unable to list nodes: %v&quot;</span>, err)<br>	&#125;<br><br>	<span class="hljs-keyword">var</span> errs []<span class="hljs-type">error</span><br>	<span class="hljs-keyword">for</span> _, node := <span class="hljs-keyword">range</span> nodes &#123;<br>        <span class="hljs-comment">// 从节点的结构体中获取这个节点的IP和name，并和kubeletClient一起组装到source中去</span><br>        <span class="hljs-comment">// 注意节点的IP时根据启动参数kubelet-preferred-address-types优先级来获取的</span><br>		info, err := p.getNodeInfo(node)<br>		<span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<br>			errs = <span class="hljs-built_in">append</span>(errs, fmt.Errorf(<span class="hljs-string">&quot;unable to extract connection information for node %q: %v&quot;</span>, node.Name, err))<br>			<span class="hljs-keyword">continue</span><br>		&#125;<br>        <span class="hljs-comment">// 注意所有source的kubeletClient是共用的，端口都是一样，区别是IP不同</span><br>		sources = <span class="hljs-built_in">append</span>(sources, NewSummaryMetricsSource(info, p.kubeletClient))<br>	&#125;<br>	<span class="hljs-keyword">return</span> sources, utilerrors.NewAggregate(errs)<br>&#125;<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">NewSummaryMetricsSource</span><span class="hljs-params">(node NodeInfo, client KubeletInterface)</span></span> sources.MetricSource &#123;<br>	<span class="hljs-keyword">return</span> &amp;summaryMetricsSource&#123;<br>		node:          node,<br>		kubeletClient: client,<br>	&#125;<br>&#125;<br></code></pre></td></tr></table></figure>
+</li>
+<li><h6 id="抓取数据并解析数据scrapeWithMetrics-ctx-source"><a href="#抓取数据并解析数据scrapeWithMetrics-ctx-source" class="headerlink" title="抓取数据并解析数据scrapeWithMetrics(ctx, source)"></a>抓取数据并解析数据<code>scrapeWithMetrics(ctx, source)</code></h6></li>
+</ol>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// pkg/sources/manager.go</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">scrapeWithMetrics</span><span class="hljs-params">(ctx context.Context, s MetricSource)</span></span> (*MetricsBatch, <span class="hljs-type">error</span>) &#123;<br>	sourceName := s.Name()<br>	startTime := time.Now()<br>	<span class="hljs-keyword">defer</span> lastScrapeTimestamp.<br>		WithLabelValues(sourceName).<br>		Set(<span class="hljs-type">float64</span>(time.Now().Unix()))<br>	<span class="hljs-keyword">defer</span> scraperDuration.<br>		WithLabelValues(sourceName).<br>		Observe(<span class="hljs-type">float64</span>(time.Since(startTime)) / <span class="hljs-type">float64</span>(time.Second))<br>    <span class="hljs-comment">// 实际调用MetricSource的Collect接口</span><br>	<span class="hljs-keyword">return</span> s.Collect(ctx)<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>这里的<code>s.Collect(ctx)</code>实际上就是步骤1中<code>NewSummaryMetricsSource</code>创建出来的<code>MetricSource</code>的<code>Collect</code></p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// pkg/sources/summary/summary.go</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(src *summaryMetricsSource)</span></span> Collect(ctx context.Context) (*sources.MetricsBatch, <span class="hljs-type">error</span>) &#123;<br>    <span class="hljs-comment">// 关键逻辑，通过当前source的kubeletClient获取节点上的metric数据，并解析到summary中</span><br>    <span class="hljs-comment">// 这里之所以把这段逻辑协程闭包是为了在GetSummary执行完之后就马上执行defer中的逻辑</span><br>	summary, err := <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">()</span></span> (*stats.Summary, <span class="hljs-type">error</span>) &#123;<br>		startTime := time.Now()<br>		<span class="hljs-keyword">defer</span> summaryRequestLatency.WithLabelValues(src.node.Name).Observe(<span class="hljs-type">float64</span>(time.Since(startTime)) / <span class="hljs-type">float64</span>(time.Second))  <span class="hljs-comment">// 马上将执行时间写入自己的metric中</span><br>		<span class="hljs-keyword">return</span> src.kubeletClient.GetSummary(ctx, src.node.ConnectAddress)<br>	&#125;()<br>    <span class="hljs-comment">// 部分省略</span><br>	res := &amp;sources.MetricsBatch&#123;<br>		Nodes: <span class="hljs-built_in">make</span>([]sources.NodeMetricsPoint, <span class="hljs-number">1</span>),<br>		Pods:  <span class="hljs-built_in">make</span>([]sources.PodMetricsPoint, <span class="hljs-built_in">len</span>(summary.Pods)),<br>	&#125;<br>    <br>    <span class="hljs-comment">// 省略部分解析summary中node和pod数据的逻辑</span><br><br>	<span class="hljs-keyword">return</span> res, utilerrors.NewAggregate(errs)<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p><code>Collect</code>的逻辑本质上是执行了<code>GetSummary</code>，这里起了一个<code>http client</code>，然后给<code>https://&#123;node ip&#125;:&#123;port&#125;/stats/summary?only_cpu_and_memory=true</code>发了一个<code>GET</code>请求并获取了返回的<code>body</code>体。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// pkg/sources/summary/client.go</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(kc *kubeletClient)</span></span> GetSummary(ctx context.Context, host <span class="hljs-type">string</span>) (*stats.Summary, <span class="hljs-type">error</span>) &#123;<br>	scheme := <span class="hljs-string">&quot;https&quot;</span><br>	<span class="hljs-keyword">if</span> kc.deprecatedNoTLS &#123;<br>		scheme = <span class="hljs-string">&quot;http&quot;</span><br>	&#125;<br>	url := url.URL&#123;<br>		Scheme:   scheme,<br>		Host:     net.JoinHostPort(host, strconv.Itoa(kc.port)),<br>		Path:     <span class="hljs-string">&quot;/stats/summary&quot;</span>,<br>		RawQuery: <span class="hljs-string">&quot;only_cpu_and_memory=true&quot;</span>,<br>	&#125;<br><br>	req, err := http.NewRequest(<span class="hljs-string">&quot;GET&quot;</span>, url.String(), <span class="hljs-literal">nil</span>)<br>	<span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<br>		<span class="hljs-keyword">return</span> <span class="hljs-literal">nil</span>, err<br>	&#125;<br>	summary := &amp;stats.Summary&#123;&#125;<br>	client := kc.client<br>	<span class="hljs-keyword">if</span> client == <span class="hljs-literal">nil</span> &#123;<br>		client = http.DefaultClient<br>	&#125;<br>    <span class="hljs-comment">// 执行req并将response中的body体保存到summary中</span><br>	err = kc.makeRequestAndGetValue(client, req.WithContext(ctx), summary)<br>	<span class="hljs-keyword">return</span> summary, err<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<ol>
+<li><h6 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h6></li>
+</ol>
+<p>通过4.2.1中的代码分析我们印证之前的过程，获取<code>metric</code>数据本质上就是调用<code>cadvisor</code>的接口来获取数据而已。这里我们有必要来看一下之前我们忽略掉的关键数据结构<code>MetricsBatch</code>，这是最终解析出来的包含了<code>node</code>和<code>pod</code>的<code>cpu</code>和<code>memory</code>信息的对象，也是传递给<code>metricSink</code>的数据。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// pkg/sources/interfaces.go</span><br><span class="hljs-comment">// MetricsBatch是所有node和所有pod的metric数据</span><br><span class="hljs-keyword">type</span> MetricsBatch <span class="hljs-keyword">struct</span> &#123;<br>	Nodes []NodeMetricsPoint<br>	Pods  []PodMetricsPoint<br>&#125;<br><span class="hljs-comment">// NodeMetricsPoint包含这个节点的metric数据</span><br><span class="hljs-keyword">type</span> NodeMetricsPoint <span class="hljs-keyword">struct</span> &#123;<br>	Name <span class="hljs-type">string</span><br>	MetricsPoint<br>&#125;<br><span class="hljs-comment">// PodMetricsPoint包含了这个pod所有容器的metric数据</span><br><span class="hljs-keyword">type</span> PodMetricsPoint <span class="hljs-keyword">struct</span> &#123;<br>	Name      <span class="hljs-type">string</span><br>	Namespace <span class="hljs-type">string</span><br>	Containers []ContainerMetricsPoint<br>&#125;<br><span class="hljs-comment">// ContainerMetricsPoint包含这个容器的metric数据</span><br><span class="hljs-keyword">type</span> ContainerMetricsPoint <span class="hljs-keyword">struct</span> &#123;<br>	Name <span class="hljs-type">string</span><br>	MetricsPoint<br>&#125;<br><span class="hljs-comment">// MetricsPoint是node和容器metric数据的基本单位，其中包含了cpu和memory度量</span><br><span class="hljs-keyword">type</span> MetricsPoint <span class="hljs-keyword">struct</span> &#123;<br>	Timestamp time.Time<br>	<span class="hljs-comment">// CpuUsage is the CPU usage rate, in cores</span><br>	CpuUsage resource.Quantity<br>	<span class="hljs-comment">// MemoryUsage is the working set size, in bytes.</span><br>	MemoryUsage resource.Quantity<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<h5 id="4-2-2、保存metric数据（rm-sink-Receive-data-）"><a href="#4-2-2、保存metric数据（rm-sink-Receive-data-）" class="headerlink" title="4.2.2、保存metric数据（rm.sink.Receive(data)）"></a>4.2.2、保存<code>metric</code>数据（<code>rm.sink.Receive(data)</code>）</h5><p>4.2.1中已经调用集群中所有节点的<code>cadvisor</code>接口并获取了所有节点和<code>pod</code>的<code>metric</code>数据，接下来就是保存到缓存中了。前面已经将获取到的数据存在了<code>data</code>（本质上就是4.2.1总结时说到的<code>MetricsBatch</code>）变量中，接下来就时对这个变量进行处理了。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// pkg/provider/sink/sinkprov.go</span><br><span class="hljs-comment">// sinkMetricsProvider既实现了provider.MetricsProvider（提供server时使用）也实现了sink.MetricSink（抓取后缓存数据用）</span><br><span class="hljs-comment">// sinkMetricsProvider本质上就是两个map，一个保存node，一个保存pod</span><br><span class="hljs-keyword">type</span> sinkMetricsProvider <span class="hljs-keyword">struct</span> &#123;<br>	mu    sync.RWMutex<br>	nodes <span class="hljs-keyword">map</span>[<span class="hljs-type">string</span>]sources.NodeMetricsPoint<br>	pods  <span class="hljs-keyword">map</span>[apitypes.NamespacedName]sources.PodMetricsPoint<br>&#125;<br><span class="hljs-comment">// metric-server收到node的GET请求调用这个函数来获取metric数据</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(p *sinkMetricsProvider)</span></span> GetNodeMetrics(nodes ...<span class="hljs-type">string</span>) ([]provider.TimeInfo, []corev1.ResourceList, <span class="hljs-type">error</span>) &#123;<br>    <span class="hljs-comment">// 代码逻辑略</span><br>&#125;<br><span class="hljs-comment">// metric-server收到pod的GET请求调用这个函数来获取metric数据</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(p *sinkMetricsProvider)</span></span> GetContainerMetrics(pods ...apitypes.NamespacedName) ([]provider.TimeInfo, [][]metrics.ContainerMetrics, <span class="hljs-type">error</span>) &#123;<br>    <span class="hljs-comment">// 代码逻辑略，4.3节的metric-server再讲</span><br>&#125;<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(p *sinkMetricsProvider)</span></span> Receive(batch *sources.MetricsBatch) <span class="hljs-type">error</span> &#123;<br>    <span class="hljs-comment">// 创建一个新的node的map，并将数据去重写入</span><br>	newNodes := <span class="hljs-built_in">make</span>(<span class="hljs-keyword">map</span>[<span class="hljs-type">string</span>]sources.NodeMetricsPoint, <span class="hljs-built_in">len</span>(batch.Nodes))<br>	<span class="hljs-keyword">for</span> _, nodePoint := <span class="hljs-keyword">range</span> batch.Nodes &#123;<br>		<span class="hljs-keyword">if</span> _, exists := newNodes[nodePoint.Name]; exists &#123;<br>			klog.Errorf(<span class="hljs-string">&quot;duplicate node %s received&quot;</span>, nodePoint.Name)<br>			<span class="hljs-keyword">continue</span><br>		&#125;<br>		newNodes[nodePoint.Name] = nodePoint<br>	&#125;<br>    <span class="hljs-comment">// 创建一个新的pod的map，并将数据去重写入</span><br>	newPods := <span class="hljs-built_in">make</span>(<span class="hljs-keyword">map</span>[apitypes.NamespacedName]sources.PodMetricsPoint, <span class="hljs-built_in">len</span>(batch.Pods))<br>	<span class="hljs-keyword">for</span> _, podPoint := <span class="hljs-keyword">range</span> batch.Pods &#123;<br>		podIdent := apitypes.NamespacedName&#123;Name: podPoint.Name, Namespace: podPoint.Namespace&#125;<br>		<span class="hljs-keyword">if</span> _, exists := newPods[podIdent]; exists &#123;<br>			klog.Errorf(<span class="hljs-string">&quot;duplicate pod %s received&quot;</span>, podIdent)<br>			<span class="hljs-keyword">continue</span><br>		&#125;<br>		newPods[podIdent] = podPoint<br>	&#125;<br><br>	p.mu.Lock()<br>	<span class="hljs-keyword">defer</span> p.mu.Unlock()<br>    <span class="hljs-comment">// 将刚创建的新map赋值给provider，注意之前的旧map就直接回收了</span><br>	p.nodes = newNodes<br>	p.pods = newPods<br><br>	<span class="hljs-keyword">return</span> <span class="hljs-literal">nil</span><br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>可以看到<code>sinkMetricsProvider</code>数据的结构体本质上就是两个<code>map</code>而已，而保存的逻辑也非常简单，直接创建两个新map并赋值过去就可以，并不需要处理之前的旧数据，简单粗暴。</p>
+<h4 id="4-3、metric-server"><a href="#4-3、metric-server" class="headerlink" title="4.3、metric-server"></a>4.3、<code>metric-server</code></h4><p>在4.1节的启动程序中已经说明了<code>metric-server</code>的启动过程，经过4.2.2的代码分析之后，我们可以猜测<code>metric-server</code>本质上就是收到请求之后到<code>sinkMetricsProvider</code>的两个<code>map</code>中读取数据并返回而已。</p>
+<p>我们回到启动程序中，这里包含了两个步骤，一个是创建好一个<code>server</code>（本质上是<code>k8s.io/apiserver</code>库的一个<code>GenericAPIServer</code>），另一个则是直接将这个<code>server</code>运行起来。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// 关键逻辑：通过配置文件创建好对应的GenericAPIServer</span><br>server, err := config.Complete(informerFactory).New()<br><span class="hljs-comment">// 将GenericAPIServer运行起来</span><br><span class="hljs-keyword">return</span> server.GenericAPIServer.PrepareRun().Run(stopCh)<br></code></pre></td></tr></table></figure>
+
+<p>由于<code>k8s.io/apiserver</code>库的原理比较复杂，暂且不表，我们只讲创建<code>GenericAPIServer</code>的创建流程并说明<code>server</code>是如何使用的。对于<code>metric-server</code>而言，需要先创建一个<code>GenericAPIServer</code>，然后将<code>metric-server</code>自己的<code>API</code>与对应的处理<code>handler</code>注册进来即可。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// pkg/apiserver/config.go</span><br><span class="hljs-keyword">type</span> MetricsServer <span class="hljs-keyword">struct</span> &#123;<br>	*genericapiserver.GenericAPIServer<br>&#125;<br><span class="hljs-comment">// New returns a new instance of MetricsServer from the given config.</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(c completedConfig)</span></span> New() (*MetricsServer, <span class="hljs-type">error</span>) &#123;<br>    <span class="hljs-comment">// 创建一个名为&quot;metrics-server&quot;的genericServer</span><br>	genericServer, err := c.CompletedConfig.New(<span class="hljs-string">&quot;metrics-server&quot;</span>, genericapiserver.NewEmptyDelegate()) <span class="hljs-comment">// completion is done in Complete, no need for a second time</span><br>	<span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<br>		<span class="hljs-keyword">return</span> <span class="hljs-literal">nil</span>, err<br>	&#125;<br>    <span class="hljs-comment">// 关键逻辑：将metric-server的处理实体注册到genericServer中，下文继续讲解</span><br>	<span class="hljs-keyword">if</span> err := generic.InstallStorage(c.ProviderConfig, c.SharedInformerFactory.Core().V1(), genericServer); err != <span class="hljs-literal">nil</span> &#123;<br>		<span class="hljs-keyword">return</span> <span class="hljs-literal">nil</span>, err<br>	&#125;<br><br>	<span class="hljs-keyword">return</span> &amp;MetricsServer&#123;<br>		GenericAPIServer: genericServer,<br>	&#125;, <span class="hljs-literal">nil</span><br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>在注册<code>metric-server</code>自己的<code>API</code>时，需要先创建一个<code>APIGroup</code>（即<code>metrics.k8s.io</code>），然后将这个<code>Group</code>下面的各个资源（例如这里的<code>&quot;nodes&quot;</code>和<code>&quot;pods&quot;</code>）的<code>Storage</code>注册到<code>VersionedResourcesStorageMap</code>中，这里面最关键的就是每个资源的<code>Storage</code>需要实现处理请求的rest接口。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// pkg/apiserver/generic/storage.go</span><br><span class="hljs-comment">// InstallStorage构造一个metrics.k8s.io的apiGroup并注册到genericServer中</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">InstallStorage</span><span class="hljs-params">(providers *ProviderConfig, informers coreinf.Interface, server *genericapiserver.GenericAPIServer)</span></span> <span class="hljs-type">error</span> &#123;<br>    <span class="hljs-comment">// 创建一个APIGroup</span><br>	info := BuildStorage(providers, informers)<br>    <span class="hljs-comment">// 将这个APIGroup注册到GenericAPIServer中</span><br>	<span class="hljs-keyword">return</span> server.InstallAPIGroup(&amp;info)<br>&#125;<br><br><span class="hljs-comment">// BuildStorage构造一个名为&quot;metrics.k8s.io&quot;的apiGroup</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">BuildStorage</span><span class="hljs-params">(providers *ProviderConfig, informers coreinf.Interface)</span></span> genericapiserver.APIGroupInfo &#123;<br>    <span class="hljs-comment">// 创建一个名为&quot;metrics.k8s.io&quot;的apiGroup</span><br>	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(metrics.GroupName, Scheme, metav1.ParameterCodec, Codecs)<br>    <span class="hljs-comment">// 创建node的storage，这个storage跟pod的类似，下文以pod为例</span><br>	nodemetricsStorage := nodemetricsstorage.NewStorage(metrics.Resource(<span class="hljs-string">&quot;nodemetrics&quot;</span>), providers.Node, informers.Nodes().Lister())<br>    <span class="hljs-comment">// 创建pod的storage，这个storage中实现了收到请求之后的处理逻辑，下文继续讲解</span><br>	podmetricsStorage := podmetricsstorage.NewStorage(metrics.Resource(<span class="hljs-string">&quot;podmetrics&quot;</span>), providers.Pod, informers.Pods().Lister())<br>    <span class="hljs-comment">// 将node和pod的Storage存放到map中</span><br>	metricsServerResources := <span class="hljs-keyword">map</span>[<span class="hljs-type">string</span>]rest.Storage&#123;<br>		<span class="hljs-string">&quot;nodes&quot;</span>: nodemetricsStorage,<br>		<span class="hljs-string">&quot;pods&quot;</span>:  podmetricsStorage,<br>	&#125;<br>    <span class="hljs-comment">// 在&quot;metrics.k8s.io&quot;这个apiGroup中注册&quot;v1beta1&quot;这个version的Storage处理map</span><br>	apiGroupInfo.VersionedResourcesStorageMap[v1beta1.SchemeGroupVersion.Version] = metricsServerResources<br>	<span class="hljs-keyword">return</span> apiGroupInfo<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>这里以<code>pod</code>的<code>MetricStorage</code>的<code>Getter</code>接口为例，这里实现的<code>Get</code>函数就是当<code>metric-server</code>收到获取某个<code>pod</code>的<code>metric</code>的请求时处理该请求的Handler。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// pkg/storage/podmetrics/reststorage.go</span><br><span class="hljs-keyword">type</span> MetricStorage <span class="hljs-keyword">struct</span> &#123;<br>	groupResource schema.GroupResource<br>	prov          provider.PodMetricsProvider<br>	podLister     v1listers.PodLister<br>&#125;<br><span class="hljs-comment">// 用来检查MetricStorage已经实现了rest的这4个接口</span><br><span class="hljs-keyword">var</span> _ rest.KindProvider = &amp;MetricStorage&#123;&#125;<br><span class="hljs-keyword">var</span> _ rest.Storage = &amp;MetricStorage&#123;&#125;<br><span class="hljs-keyword">var</span> _ rest.Getter = &amp;MetricStorage&#123;&#125;<br><span class="hljs-keyword">var</span> _ rest.Lister = &amp;MetricStorage&#123;&#125;<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">NewStorage</span><span class="hljs-params">(groupResource schema.GroupResource, prov provider.PodMetricsProvider, podLister v1listers.PodLister)</span></span> *MetricStorage &#123;<br>	<span class="hljs-keyword">return</span> &amp;MetricStorage&#123;<br>		groupResource: groupResource,<br>		prov:          prov,<br>		podLister:     podLister,<br>	&#125;<br>&#125;<br><br><span class="hljs-comment">// 实现rest.Getter接口</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(m *MetricStorage)</span></span> Get(ctx context.Context, name <span class="hljs-type">string</span>, opts *metav1.GetOptions) (runtime.Object, <span class="hljs-type">error</span>) &#123;<br>	namespace := genericapirequest.NamespaceValue(ctx)<br>    <span class="hljs-comment">// 从k8s的client缓存中获取pod信息</span><br>	pod, err := m.podLister.Pods(namespace).Get(name)<br>    <br>    <span class="hljs-comment">// 省略异常处理的逻辑</span><br>    <br>    <span class="hljs-comment">// 从之前的sinkMetric缓存中获取这个pod的</span><br>	podMetrics, err := m.getPodMetrics(pod)<br>    <br>    <span class="hljs-comment">// 省略异常处理的逻辑</span><br>    <br>	<span class="hljs-keyword">return</span> &amp;podMetrics[<span class="hljs-number">0</span>], <span class="hljs-literal">nil</span><br>&#125;<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(m *MetricStorage)</span></span> getPodMetrics(pods ...*v1.Pod) ([]metrics.PodMetrics, <span class="hljs-type">error</span>) &#123;<br>	namespacedNames := <span class="hljs-built_in">make</span>([]apitypes.NamespacedName, <span class="hljs-built_in">len</span>(pods))<br>	<span class="hljs-keyword">for</span> i, pod := <span class="hljs-keyword">range</span> pods &#123;<br>		namespacedNames[i] = apitypes.NamespacedName&#123;<br>			Name:      pod.Name,<br>			Namespace: pod.Namespace,<br>		&#125;<br>	&#125;<br>    <span class="hljs-comment">// 从缓存中获取pod的metric数据，这其实就是调用的4.2.2节中的GetContainerMetrics</span><br>	timestamps, containerMetrics, err := m.prov.GetContainerMetrics(namespacedNames...)<br>	<span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<br>		<span class="hljs-keyword">return</span> <span class="hljs-literal">nil</span>, err<br>	&#125;<br>	res := <span class="hljs-built_in">make</span>([]metrics.PodMetrics, <span class="hljs-number">0</span>, <span class="hljs-built_in">len</span>(pods))<br>	<span class="hljs-keyword">for</span> i, pod := <span class="hljs-keyword">range</span> pods &#123;<br>        <span class="hljs-comment">// 省略pod状态不为Running和metric数据为空的continue逻辑</span><br><br>        <span class="hljs-comment">// 创建返回体的内容</span><br>		res = <span class="hljs-built_in">append</span>(res, metrics.PodMetrics&#123;<br>			ObjectMeta: metav1.ObjectMeta&#123;<br>				Name:              pod.Name,<br>				Namespace:         pod.Namespace,<br>				CreationTimestamp: metav1.NewTime(time.Now()),<br>			&#125;,<br>			Timestamp:  metav1.NewTime(timestamps[i].Timestamp),<br>			Window:     metav1.Duration&#123;Duration: timestamps[i].Window&#125;,<br>			Containers: containerMetrics[i],<br>		&#125;)<br>	&#125;<br>	<span class="hljs-keyword">return</span> res, <span class="hljs-literal">nil</span><br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>这里我们终于又回到了4.2.2中的<code>sinkMetricsProvider</code>，这不过这次是从其<code>map</code>中读取数据。在此数据抓取和<code>metric-server</code>这两部分就连到一起了，我们其实也可以把这两部分当成一个生产者消费者模式，前者负责生产数据，后者则读取数据。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// pkg/provider/sink/sinkprov.go</span><br><span class="hljs-comment">// metric-server收到pod的GET请求调用这个函数来获取metric数据</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(p *sinkMetricsProvider)</span></span> GetContainerMetrics(pods ...apitypes.NamespacedName) ([]provider.TimeInfo, [][]metrics.ContainerMetrics, <span class="hljs-type">error</span>) &#123;<br>	p.mu.RLock()<br>	<span class="hljs-keyword">defer</span> p.mu.RUnlock()<br><br>	timestamps := <span class="hljs-built_in">make</span>([]provider.TimeInfo, <span class="hljs-built_in">len</span>(pods))<br>	resMetrics := <span class="hljs-built_in">make</span>([][]metrics.ContainerMetrics, <span class="hljs-built_in">len</span>(pods))<br><br>	<span class="hljs-keyword">for</span> i, pod := <span class="hljs-keyword">range</span> pods &#123;<br>        <span class="hljs-comment">// 从pod的map中获取metric数据</span><br>		metricPoint, present := p.pods[pod]<br>		<span class="hljs-keyword">if</span> !present &#123;<br>			<span class="hljs-keyword">continue</span><br>		&#125;<br><br>		<span class="hljs-comment">// 省略中间的处理逻辑</span><br>		resMetrics[i] = contMetrics<br>	&#125;<br>	<span class="hljs-keyword">return</span> timestamps, resMetrics, <span class="hljs-literal">nil</span><br>&#125;<br></code></pre></td></tr></table></figure>
+
+                
+              </div>
+            
+            <hr/>
+            <div>
+              <div class="post-metas my-3">
+  
+  
+    <div class="post-meta">
+      <i class="iconfont icon-tags"></i>
+      
+        <a href="/tags/k8s/" class="print-no-link">#k8s</a>
+      
+    </div>
+  
+</div>
+
+
+              
+  
+
+  <div class="license-box my-3">
+    <div class="license-title">
+      <div>metrics-server源码解读</div>
+      <div>http://guy-18.github.io/2025/04/08/metrics-server源码解读/</div>
+    </div>
+    <div class="license-meta">
+      
+        <div class="license-meta-item">
+          <div>作者</div>
+          <div>John</div>
+        </div>
+      
+      
+        <div class="license-meta-item license-meta-date">
+          <div>发布于</div>
+          <div>2025年4月8日</div>
+        </div>
+      
+      
+      
+        <div class="license-meta-item">
+          <div>许可协议</div>
+          <div>
+            
+              
+              
+                <a class="print-no-link" target="_blank" href="https://creativecommons.org/licenses/by/4.0/">
+                  <span class="hint--top hint--rounded" aria-label="BY - 署名">
+                    <i class="iconfont icon-cc-by"></i>
+                  </span>
+                </a>
+              
+            
+          </div>
+        </div>
+      
+    </div>
+    <div class="license-icon iconfont"></div>
+  </div>
+
+
+
+              
+                <div class="post-prevnext my-3">
+                  <article class="post-prev col-6">
+                    
+                    
+                      <a href="/2025/04/20/Go%E7%AE%97%E6%B3%95%E9%A2%98/" title="Go算法题">
+                        <i class="iconfont icon-arrowleft"></i>
+                        <span class="hidden-mobile">Go算法题</span>
+                        <span class="visible-mobile">上一篇</span>
+                      </a>
+                    
+                  </article>
+                  <article class="post-next col-6">
+                    
+                    
+                      <a href="/2025/04/06/Go-sync%E5%8C%85%E4%BB%8B%E7%BB%8D/" title="Go-sync包介绍">
+                        <span class="hidden-mobile">Go-sync包介绍</span>
+                        <span class="visible-mobile">下一篇</span>
+                        <i class="iconfont icon-arrowright"></i>
+                      </a>
+                    
+                  </article>
+                </div>
+              
+            </div>
+
+            
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+  <aside class="sidebar" style="margin-left: -1rem">
+    <div id="toc">
+  <p class="toc-header">
+    <i class="iconfont icon-list"></i>
+    <span>目录</span>
+  </p>
+  <div class="toc-body" id="toc-body"></div>
+</div>
+
+
+
+  </aside>
+
+
+    </div>
+  </div>
+</div>
+
+
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+
+
+
+
+    
+
+    
+      <a id="scroll-top-button" aria-label="TOP" href="#" role="button">
+        <i class="iconfont icon-arrowup" aria-hidden="true"></i>
+      </a>
+    
+
+    
+      <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header text-center">
+        <h4 class="modal-title w-100 font-weight-bold">搜索</h4>
+        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body mx-3">
+        <div class="md-form mb-5">
+          <input type="text" id="local-search-input" class="form-control validate">
+          <label data-error="x" data-success="v" for="local-search-input">关键词</label>
+        </div>
+        <div class="list-group" id="local-search-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+    
+
+    
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+  
+    <div class="footer-content">
+       <a href="https://hexo.io" target="_blank" rel="nofollow noopener"><span>Hexo</span></a> <i class="iconfont icon-love"></i> <a href="https://github.com/fluid-dev/hexo-theme-fluid" target="_blank" rel="nofollow noopener"><span>Fluid</span></a> 
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+
+  <!-- Scripts -->
+  
+  <script  src="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.js" ></script>
+  <link  rel="stylesheet" href="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.css" />
+
+  <script>
+    NProgress.configure({"showSpinner":false,"trickleSpeed":100})
+    NProgress.start()
+    window.addEventListener('load', function() {
+      NProgress.done();
+    })
+  </script>
+
+
+<script  src="https://lib.baomitu.com/jquery/3.6.4/jquery.min.js" ></script>
+<script  src="https://lib.baomitu.com/twitter-bootstrap/4.6.1/js/bootstrap.min.js" ></script>
+<script  src="/js/events.js" ></script>
+<script  src="/js/plugins.js" ></script>
+
+
+  <script  src="https://lib.baomitu.com/typed.js/2.0.12/typed.min.js" ></script>
+  <script>
+    (function (window, document) {
+      var typing = Fluid.plugins.typing;
+      var subtitle = document.getElementById('subtitle');
+      if (!subtitle || !typing) {
+        return;
+      }
+      var text = subtitle.getAttribute('data-typed-text');
+      
+        typing(text);
+      
+    })(window, document);
+  </script>
+
+
+
+
+  
+    <script  src="/js/img-lazyload.js" ></script>
+  
+
+
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/tocbot/4.20.1/tocbot.min.js', function() {
+    var toc = jQuery('#toc');
+    if (toc.length === 0 || !window.tocbot) { return; }
+    var boardCtn = jQuery('#board-ctn');
+    var boardTop = boardCtn.offset().top;
+
+    window.tocbot.init(Object.assign({
+      tocSelector     : '#toc-body',
+      contentSelector : '.markdown-body',
+      linkClass       : 'tocbot-link',
+      activeLinkClass : 'tocbot-active-link',
+      listClass       : 'tocbot-list',
+      isCollapsedClass: 'tocbot-is-collapsed',
+      collapsibleClass: 'tocbot-is-collapsible',
+      scrollSmooth    : true,
+      includeTitleTags: true,
+      headingsOffset  : -boardTop,
+    }, CONFIG.toc));
+    if (toc.find('.toc-list-item').length > 0) {
+      toc.css('visibility', 'visible');
+    }
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('tocbot' in window) {
+        tocbot.refresh();
+        var toc = jQuery('#toc');
+        if (toc.length === 0 || !tocbot) {
+          return;
+        }
+        if (toc.find('.toc-list-item').length > 0) {
+          toc.css('visibility', 'visible');
+        }
+      }
+    });
+  });
+</script>
+
+
+  <script src=https://lib.baomitu.com/clipboard.js/2.0.11/clipboard.min.js></script>
+
+  <script>Fluid.plugins.codeWidget();</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/anchor-js/5.0.0/anchor.min.js', function() {
+    window.anchors.options = {
+      placement: CONFIG.anchorjs.placement,
+      visible  : CONFIG.anchorjs.visible
+    };
+    if (CONFIG.anchorjs.icon) {
+      window.anchors.options.icon = CONFIG.anchorjs.icon;
+    }
+    var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+    var res = [];
+    for (var item of el) {
+      res.push('.markdown-body > ' + item.trim());
+    }
+    if (CONFIG.anchorjs.placement === 'left') {
+      window.anchors.options.class = 'anchorjs-link-left';
+    }
+    window.anchors.add(res.join(', '));
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('anchors' in window) {
+        anchors.removeAll();
+        var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+        var res = [];
+        for (var item of el) {
+          res.push('.markdown-body > ' + item.trim());
+        }
+        if (CONFIG.anchorjs.placement === 'left') {
+          anchors.options.class = 'anchorjs-link-left';
+        }
+        anchors.add(res.join(', '));
+      }
+    });
+  });
+</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.js', function() {
+    Fluid.plugins.fancyBox();
+  });
+</script>
+
+
+  <script>Fluid.plugins.imageCaption();</script>
+
+  <script  src="/js/local-search.js" ></script>
+
+
+
+
+
+<!-- 主题的启动项，将它保持在最底部 -->
+<!-- the boot of the theme, keep it at the bottom -->
+<script  src="/js/boot.js" ></script>
+
+
+  
+
+  <noscript>
+    <div class="noscript-warning">博客在允许 JavaScript 运行的环境下浏览效果更佳</div>
+  </noscript>
+</body>
+</html>
