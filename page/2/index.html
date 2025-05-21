@@ -229,6 +229,86 @@
     <article class="col-12 col-md-12 mx-auto index-info">
       <h2 class="index-header">
         
+        <a href="/2025/04/03/kubernetes%E4%B9%8Bclient-go%E4%B9%8Binformer%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90/" target="_self">
+          kubernetes之client-go之informer工作原理源码解析
+        </a>
+      </h2>
+
+      
+      <a class="index-excerpt index-excerpt__noimg" href="/2025/04/03/kubernetes%E4%B9%8Bclient-go%E4%B9%8Binformer%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90/" target="_self">
+        <div>
+          转自：https://blog.haohtml.com/archives/32179/ kubernetes 之 client-go 之 informer 工作原理源码解析本文主要介绍有关 client go 架构实现原理，在整个client-go架构中有一个很重要的组件就是 informer，本节我们重点对其进行一些介绍。 Informer 机制采用 k8s HTTP API 可以查询集群中所有
+        </div>
+      </a>
+
+      <div class="index-btm post-metas">
+        
+          <div class="post-meta mr-3">
+            <i class="iconfont icon-date"></i>
+            <time datetime="2025-04-03 00:29" pubdate>
+              2025-04-03
+            </time>
+          </div>
+        
+        
+        
+          <div class="post-meta">
+            <i class="iconfont icon-tags"></i>
+            
+              <a href="/tags/k8s/">#k8s</a>
+            
+          </div>
+        
+      </div>
+    </article>
+  </div>
+
+  <div class="row mx-auto index-card">
+    
+    
+    <article class="col-12 col-md-12 mx-auto index-info">
+      <h2 class="index-header">
+        
+        <a href="/2025/04/02/Client-go%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E4%B9%8BListerWatcher/" target="_self">
+          Client-go源码分析之ListerWatcher
+        </a>
+      </h2>
+
+      
+      <a class="index-excerpt index-excerpt__noimg" href="/2025/04/02/Client-go%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E4%B9%8BListerWatcher/" target="_self">
+        <div>
+          一 背景kubernetes所有API对象都存储在etcd中，并只能通过apiserver访问。如果很多客户端频繁的列举全量对象（比如列举所有的Pod），这会造成apiserver不堪重负。 ListerWatcher是Lister和Watcher的结合体，ListerWatcher负责列举全量对象，Watcher负责监视（本文将watch翻译为监视）对象的增量变化。 通过客户端缓存，至在没有任何
+        </div>
+      </a>
+
+      <div class="index-btm post-metas">
+        
+          <div class="post-meta mr-3">
+            <i class="iconfont icon-date"></i>
+            <time datetime="2025-04-02 21:42" pubdate>
+              2025-04-02
+            </time>
+          </div>
+        
+        
+        
+          <div class="post-meta">
+            <i class="iconfont icon-tags"></i>
+            
+              <a href="/tags/k8s/">#k8s</a>
+            
+          </div>
+        
+      </div>
+    </article>
+  </div>
+
+  <div class="row mx-auto index-card">
+    
+    
+    <article class="col-12 col-md-12 mx-auto index-info">
+      <h2 class="index-header">
+        
         <a href="/2025/04/01/Golang%E4%B8%AD%E7%9A%84Defer%E5%BF%85%E6%8E%8C%E6%8F%A1%E7%9A%847%E7%9F%A5%E8%AF%86%E7%82%B9/" target="_self">
           Golang中的Defer必掌握的7知识点
         </a>
@@ -531,72 +611,6 @@
               <a href="/tags/k8s/">#k8s</a>
             
           </div>
-        
-      </div>
-    </article>
-  </div>
-
-  <div class="row mx-auto index-card">
-    
-    
-    <article class="col-12 col-md-12 mx-auto index-info">
-      <h2 class="index-header">
-        
-        <a href="/2025/03/27/k8s-%E9%80%89%E4%B8%BB-%E5%AE%9E%E6%88%98%E9%AA%8C%E8%AF%81/" target="_self">
-          k8s-选主-实战验证
-        </a>
-      </h2>
-
-      
-      <a class="index-excerpt index-excerpt__noimg" href="/2025/03/27/k8s-%E9%80%89%E4%B8%BB-%E5%AE%9E%E6%88%98%E9%AA%8C%E8%AF%81/" target="_self">
-        <div>
-          k8s-选主-实战验证转自：https://blog.csdn.net/boling_cavalry/article/details/132129123 本篇概览•本文是《client-go实战》系列的第十二篇，又有一个精彩的知识点在本章呈现：选主(leader-election)•在解释什么是选主之前，咱们先来看一个场景（有真实适用场景的技术，学起来才有动力），如下图所示（稍后有详细说明）  上
-        </div>
-      </a>
-
-      <div class="index-btm post-metas">
-        
-          <div class="post-meta mr-3">
-            <i class="iconfont icon-date"></i>
-            <time datetime="2025-03-27 22:46" pubdate>
-              2025-03-27
-            </time>
-          </div>
-        
-        
-        
-      </div>
-    </article>
-  </div>
-
-  <div class="row mx-auto index-card">
-    
-    
-    <article class="col-12 col-md-12 mx-auto index-info">
-      <h2 class="index-header">
-        
-        <a href="/2025/03/27/k8s-%E9%80%89%E4%B8%BB/" target="_self">
-          k8s-选主
-        </a>
-      </h2>
-
-      
-      <a class="index-excerpt index-excerpt__noimg" href="/2025/03/27/k8s-%E9%80%89%E4%B8%BB/" target="_self">
-        <div>
-          k8s-选主选主是为了在多副本的情况下，避免同一个操作被所有副本分别执行一次（实际只需要执行一次）。 所以将只需要执行一次的逻辑封装进一个函数，在执行这个函数之前，先进行选主，只有成为leader的副本才会执行该函数。 实际应用中，可以将自定义的controller逻辑封装起来，只在选主成功的副本里运行controller。其余的副本什么也不做，只是待命而已。这样在leader挂了之后，能快速的切
-        </div>
-      </a>
-
-      <div class="index-btm post-metas">
-        
-          <div class="post-meta mr-3">
-            <i class="iconfont icon-date"></i>
-            <time datetime="2025-03-27 22:46" pubdate>
-              2025-03-27
-            </time>
-          </div>
-        
-        
         
       </div>
     </article>
