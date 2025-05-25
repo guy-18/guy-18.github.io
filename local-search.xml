@@ -4,6 +4,19 @@
   
   
   <entry>
+    <title>Linux下查看日志常用命令</title>
+    <link href="/2025/05/25/Linux%E4%B8%8B%E6%9F%A5%E7%9C%8B%E6%97%A5%E5%BF%97%E5%B8%B8%E7%94%A8%E5%91%BD%E4%BB%A4/"/>
+    <url>/2025/05/25/Linux%E4%B8%8B%E6%9F%A5%E7%9C%8B%E6%97%A5%E5%BF%97%E5%B8%B8%E7%94%A8%E5%91%BD%E4%BB%A4/</url>
+    
+    <content type="html"><![CDATA[<h2 id="Linux查看日志常用命令"><a href="#Linux查看日志常用命令" class="headerlink" title="Linux查看日志常用命令"></a>Linux查看日志常用命令</h2><h3 id="tail"><a href="#tail" class="headerlink" title="tail"></a>tail</h3><p>-f 实时监控</p><p>-n 指定行数</p><p>-c 指定字符数</p><p><code>tail test.log</code> 默认显示最后10行</p><p><code>tail -n +20 test.log</code> 显示从第20行至末尾。</p><p><code>tail -f test.log</code> 默认显示最后10行，并实时监控，若有新增加的行则继续显示，直到退出程序。</p><p><code>tail -c 10 notes.log</code> 显示最后10个字符</p><h3 id="head"><a href="#head" class="headerlink" title="head"></a>head</h3><p>与tail相反</p><p><code>head test.log</code> 默认显示开头10行</p><p><code>head -n 20 test.log</code> 显示开头20行</p><p><code>head -c 20 test.log</code> 显示开头20个字符</p>]]></content>
+    
+    
+    
+  </entry>
+  
+  
+  
+  <entry>
     <title>Go算法题-5</title>
     <link href="/2025/05/21/Go%E7%AE%97%E6%B3%95%E9%A2%98-%E4%BA%94/"/>
     <url>/2025/05/21/Go%E7%AE%97%E6%B3%95%E9%A2%98-%E4%BA%94/</url>
