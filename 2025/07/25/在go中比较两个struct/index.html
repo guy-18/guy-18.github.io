@@ -19,21 +19,21 @@
   <meta name="author" content="John">
   <meta name="keywords" content="">
   
-    <meta name="description" content="k8s网络隔离策略在 Kubernetes 中，默认情况下，所有命名空间（Namespace）中的 Pod 可以通过网络直接互通，除非配置了 NetworkPolicy 显式限制流量。如果您的集群已经启用了网络插件（如 Calico、Cilium 等），并且需要 明确允许 ns-a 和 ns-b 互通，可以按以下步骤操作：  方法 1：允许特定命名空间之间的流量1. 创建 NetworkPolic">
+    <meta name="description" content="在Go中比较两个Struct在Go语言中，两个struct是否可以用&#x3D;&#x3D;操作符进行比较取决于struct的组成。 可比较的情况当struct满足以下条件时，可以直接用&#x3D;&#x3D;比较：  所有字段都是可比较的类型：  基本类型（int, float, string等） 指针 数组（元素类型可比较） 其他可比较的struct channel   不包含不可比较的字段：  slice map function">
 <meta property="og:type" content="article">
-<meta property="og:title" content="k8s网络隔离策略">
-<meta property="og:url" content="http://guy-18.github.io/2025/07/25/k8s%E7%BD%91%E7%BB%9C%E9%9A%94%E7%A6%BB%E7%AD%96%E7%95%A5/index.html">
+<meta property="og:title" content="在go中比较两个struct">
+<meta property="og:url" content="http://guy-18.github.io/2025/07/25/%E5%9C%A8go%E4%B8%AD%E6%AF%94%E8%BE%83%E4%B8%A4%E4%B8%AAstruct/index.html">
 <meta property="og:site_name" content="John的博客">
-<meta property="og:description" content="k8s网络隔离策略在 Kubernetes 中，默认情况下，所有命名空间（Namespace）中的 Pod 可以通过网络直接互通，除非配置了 NetworkPolicy 显式限制流量。如果您的集群已经启用了网络插件（如 Calico、Cilium 等），并且需要 明确允许 ns-a 和 ns-b 互通，可以按以下步骤操作：  方法 1：允许特定命名空间之间的流量1. 创建 NetworkPolic">
+<meta property="og:description" content="在Go中比较两个Struct在Go语言中，两个struct是否可以用&#x3D;&#x3D;操作符进行比较取决于struct的组成。 可比较的情况当struct满足以下条件时，可以直接用&#x3D;&#x3D;比较：  所有字段都是可比较的类型：  基本类型（int, float, string等） 指针 数组（元素类型可比较） 其他可比较的struct channel   不包含不可比较的字段：  slice map function">
 <meta property="og:locale" content="zh_CN">
-<meta property="article:published_time" content="2025-07-25T13:20:59.000Z">
-<meta property="article:modified_time" content="2025-07-25T13:23:25.355Z">
+<meta property="article:published_time" content="2025-07-25T13:32:10.000Z">
+<meta property="article:modified_time" content="2025-07-25T13:32:49.185Z">
 <meta property="article:author" content="John">
 <meta name="twitter:card" content="summary_large_image">
   
   
   
-  <title>k8s网络隔离策略 - John的博客</title>
+  <title>在go中比较两个struct - John的博客</title>
 
   <link  rel="stylesheet" href="https://lib.baomitu.com/twitter-bootstrap/4.6.1/css/bootstrap.min.css" />
 
@@ -199,7 +199,7 @@
       <div class="banner-text text-center fade-in-up">
         <div class="h2">
           
-            <span id="subtitle" data-typed-text="k8s网络隔离策略"></span>
+            <span id="subtitle" data-typed-text="在go中比较两个struct"></span>
           
         </div>
 
@@ -210,7 +210,7 @@
     
       <span class="post-meta">
         <i class="iconfont icon-date-fill" aria-hidden="true"></i>
-        <time datetime="2025-07-25 21:20" pubdate>
+        <time datetime="2025-07-25 21:32" pubdate>
           2025年7月25日 晚上
         </time>
       </span>
@@ -222,7 +222,7 @@
       <span class="post-meta mr-2">
         <i class="iconfont icon-chart"></i>
         
-          678 字
+          341 字
         
       </span>
     
@@ -233,7 +233,7 @@
         
         
         
-          6 分钟
+          3 分钟
         
       </span>
     
@@ -270,42 +270,48 @@
       <div class="container nopadding-x-md" id="board-ctn">
         <div id="board">
           <article class="post-content mx-auto">
-            <h1 id="seo-header">k8s网络隔离策略</h1>
+            <h1 id="seo-header">在go中比较两个struct</h1>
             
             
               <div class="markdown-body">
                 
-                <h1 id="k8s网络隔离策略"><a href="#k8s网络隔离策略" class="headerlink" title="k8s网络隔离策略"></a>k8s网络隔离策略</h1><p>在 Kubernetes 中，默认情况下，<strong>所有命名空间（Namespace）中的 Pod 可以通过网络直接互通</strong>，除非配置了 <strong>NetworkPolicy</strong> 显式限制流量。如果您的集群已经启用了网络插件（如 Calico、Cilium 等），并且需要 <strong>明确允许 <code>ns-a</code> 和 <code>ns-b</code> 互通</strong>，可以按以下步骤操作：</p>
-<hr>
-<h3 id="方法-1：允许特定命名空间之间的流量"><a href="#方法-1：允许特定命名空间之间的流量" class="headerlink" title="方法 1：允许特定命名空间之间的流量"></a><strong>方法 1：允许特定命名空间之间的流量</strong></h3><h4 id="1-创建-NetworkPolicy（允许-ns-a-访问-ns-b）"><a href="#1-创建-NetworkPolicy（允许-ns-a-访问-ns-b）" class="headerlink" title="1. 创建 NetworkPolicy（允许 ns-a 访问 ns-b）"></a><strong>1. 创建 NetworkPolicy（允许 <code>ns-a</code> 访问 <code>ns-b</code>）</strong></h4><p>以下策略允许 <code>ns-a</code> 中的 Pod 访问 <code>ns-b</code> 中的 Pod：</p>
-<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><code class="hljs yaml"><span class="hljs-comment"># allow-ns-a-to-ns-b.yaml</span><br><span class="hljs-attr">apiVersion:</span> <span class="hljs-string">networking.k8s.io/v1</span><br><span class="hljs-attr">kind:</span> <span class="hljs-string">NetworkPolicy</span><br><span class="hljs-attr">metadata:</span><br>  <span class="hljs-attr">name:</span> <span class="hljs-string">allow-ns-a-to-ns-b</span><br>  <span class="hljs-attr">namespace:</span> <span class="hljs-string">ns-b</span>  <span class="hljs-comment"># 作用在 ns-b 上，控制入站流量</span><br><span class="hljs-attr">spec:</span><br>  <span class="hljs-attr">podSelector:</span> &#123;&#125;  <span class="hljs-comment"># 匹配 ns-b 中的所有 Pod</span><br>  <span class="hljs-attr">policyTypes:</span><br>  <span class="hljs-bullet">-</span> <span class="hljs-string">Ingress</span><br>  <span class="hljs-attr">ingress:</span><br>  <span class="hljs-bullet">-</span> <span class="hljs-attr">from:</span><br>    <span class="hljs-bullet">-</span> <span class="hljs-attr">namespaceSelector:</span><br>        <span class="hljs-attr">matchLabels:</span><br>          <span class="hljs-attr">kubernetes.io/metadata.name:</span> <span class="hljs-string">ns-a</span>  <span class="hljs-comment"># 允许来自 ns-a 的流量</span><br></code></pre></td></tr></table></figure>
-
-<h4 id="2-创建反向策略（允许-ns-b-访问-ns-a）"><a href="#2-创建反向策略（允许-ns-b-访问-ns-a）" class="headerlink" title="2. 创建反向策略（允许 ns-b 访问 ns-a）"></a><strong>2. 创建反向策略（允许 <code>ns-b</code> 访问 <code>ns-a</code>）</strong></h4><figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><code class="hljs yaml"><span class="hljs-comment"># allow-ns-b-to-ns-a.yaml</span><br><span class="hljs-attr">apiVersion:</span> <span class="hljs-string">networking.k8s.io/v1</span><br><span class="hljs-attr">kind:</span> <span class="hljs-string">NetworkPolicy</span><br><span class="hljs-attr">metadata:</span><br>  <span class="hljs-attr">name:</span> <span class="hljs-string">allow-ns-b-to-ns-a</span><br>  <span class="hljs-attr">namespace:</span> <span class="hljs-string">ns-a</span>  <span class="hljs-comment"># 作用在 ns-a 上</span><br><span class="hljs-attr">spec:</span><br>  <span class="hljs-attr">podSelector:</span> &#123;&#125;  <span class="hljs-comment"># 匹配 ns-a 中的所有 Pod</span><br>  <span class="hljs-attr">policyTypes:</span><br>  <span class="hljs-bullet">-</span> <span class="hljs-string">Ingress</span><br>  <span class="hljs-attr">ingress:</span><br>  <span class="hljs-bullet">-</span> <span class="hljs-attr">from:</span><br>    <span class="hljs-bullet">-</span> <span class="hljs-attr">namespaceSelector:</span><br>        <span class="hljs-attr">matchLabels:</span><br>          <span class="hljs-attr">kubernetes.io/metadata.name:</span> <span class="hljs-string">ns-b</span>  <span class="hljs-comment"># 允许来自 ns-b 的流量</span><br></code></pre></td></tr></table></figure>
-
-<h4 id="3-应用策略"><a href="#3-应用策略" class="headerlink" title="3. 应用策略"></a><strong>3. 应用策略</strong></h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><code class="hljs bash">kubectl apply -f allow-ns-a-to-ns-b.yaml<br>kubectl apply -f allow-ns-b-to-ns-a.yaml<br></code></pre></td></tr></table></figure>
-
-<hr>
-<h3 id="方法-2：更精细的-Pod-选择器"><a href="#方法-2：更精细的-Pod-选择器" class="headerlink" title="方法 2：更精细的 Pod 选择器"></a><strong>方法 2：更精细的 Pod 选择器</strong></h3><p>如果只需要允许特定 Pod 互通（而非整个命名空间），可以通过 <code>podSelector</code> 进一步限制：</p>
-<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><code class="hljs yaml"><span class="hljs-attr">ingress:</span><br><span class="hljs-bullet">-</span> <span class="hljs-attr">from:</span><br>  <span class="hljs-bullet">-</span> <span class="hljs-attr">namespaceSelector:</span><br>      <span class="hljs-attr">matchLabels:</span><br>        <span class="hljs-attr">kubernetes.io/metadata.name:</span> <span class="hljs-string">ns-a</span><br>    <span class="hljs-attr">podSelector:</span><br>      <span class="hljs-attr">matchLabels:</span><br>        <span class="hljs-attr">app:</span> <span class="hljs-string">backend</span>  <span class="hljs-comment"># 仅允许 ns-a 中带有 `app=backend` 标签的 Pod</span><br></code></pre></td></tr></table></figure>
-
-<hr>
-<h3 id="验证互通性"><a href="#验证互通性" class="headerlink" title="验证互通性"></a><strong>验证互通性</strong></h3><ol>
-<li>在 <code>ns-a</code> 和 <code>ns-b</code> 中分别启动一个测试 Pod：<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><code class="hljs bash">kubectl run test-pod -n ns-a --image=alpine -- <span class="hljs-built_in">sleep</span> 3600<br>kubectl run test-pod -n ns-b --image=alpine -- <span class="hljs-built_in">sleep</span> 3600<br></code></pre></td></tr></table></figure></li>
-<li>测试网络连通性：<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><code class="hljs bash">kubectl <span class="hljs-built_in">exec</span> -n ns-a test-pod -- ping &lt;ns-b-test-pod-IP&gt;<br>kubectl <span class="hljs-built_in">exec</span> -n ns-b test-pod -- ping &lt;ns-a-test-pod-IP&gt;<br></code></pre></td></tr></table></figure></li>
+                <h1 id="在Go中比较两个Struct"><a href="#在Go中比较两个Struct" class="headerlink" title="在Go中比较两个Struct"></a>在Go中比较两个Struct</h1><p>在Go语言中，两个struct是否可以用<code>==</code>操作符进行比较取决于struct的组成。</p>
+<h2 id="可比较的情况"><a href="#可比较的情况" class="headerlink" title="可比较的情况"></a>可比较的情况</h2><p>当struct满足以下条件时，可以直接用<code>==</code>比较：</p>
+<ol>
+<li><p><strong>所有字段都是可比较的类型</strong>：</p>
+<ul>
+<li>基本类型（int, float, string等）</li>
+<li>指针</li>
+<li>数组（元素类型可比较）</li>
+<li>其他可比较的struct</li>
+<li>channel</li>
+</ul>
+</li>
+<li><p><strong>不包含不可比较的字段</strong>：</p>
+<ul>
+<li>slice</li>
+<li>map</li>
+<li>function</li>
+</ul>
+</li>
 </ol>
-<hr>
-<h3 id="关键注意事项"><a href="#关键注意事项" class="headerlink" title="关键注意事项"></a><strong>关键注意事项</strong></h3><ol>
-<li><strong>网络插件支持</strong>：确保集群已安装支持 <code>NetworkPolicy</code> 的 CNI 插件（如 Calico、Cilium、WeaveNet）。</li>
-<li><strong>默认拒绝策略</strong>：如果集群配置了默认拒绝所有流量的策略（如 <code>default-deny</code>），则必须显式允许 <code>ns-a</code> 和 <code>ns-b</code> 的互通。</li>
-<li><strong>标签匹配</strong>：Kubernetes 自动为命名空间添加 <code>kubernetes.io/metadata.name</code> 标签，可直接用于 <code>namespaceSelector</code>。</li>
-</ol>
-<hr>
-<h3 id="补充：完全隔离其他命名空间"><a href="#补充：完全隔离其他命名空间" class="headerlink" title="补充：完全隔离其他命名空间"></a><strong>补充：完全隔离其他命名空间</strong></h3><p>如果希望 <strong>仅允许 <code>ns-a</code> 和 <code>ns-b</code> 互通，并拒绝其他命名空间</strong>，可以在两个命名空间中添加以下策略：</p>
-<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><code class="hljs yaml"><span class="hljs-comment"># default-deny.yaml（分别在 ns-a 和 ns-b 中创建）</span><br><span class="hljs-attr">apiVersion:</span> <span class="hljs-string">networking.k8s.io/v1</span><br><span class="hljs-attr">kind:</span> <span class="hljs-string">NetworkPolicy</span><br><span class="hljs-attr">metadata:</span><br>  <span class="hljs-attr">name:</span> <span class="hljs-string">default-deny</span><br>  <span class="hljs-attr">namespace:</span> <span class="hljs-string">ns-a</span>  <span class="hljs-comment"># 或 ns-b</span><br><span class="hljs-attr">spec:</span><br>  <span class="hljs-attr">podSelector:</span> &#123;&#125;<br>  <span class="hljs-attr">policyTypes:</span><br>  <span class="hljs-bullet">-</span> <span class="hljs-string">Ingress</span><br>  <span class="hljs-attr">ingress:</span> []  <span class="hljs-comment"># 显式拒绝所有入站流量（后续再通过允许策略放行）</span><br></code></pre></td></tr></table></figure>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-keyword">type</span> Person <span class="hljs-keyword">struct</span> &#123;<br>    Name <span class="hljs-type">string</span><br>    Age  <span class="hljs-type">int</span><br>&#125;<br><br>p1 := Person&#123;<span class="hljs-string">&quot;Alice&quot;</span>, <span class="hljs-number">30</span>&#125;<br>p2 := Person&#123;<span class="hljs-string">&quot;Alice&quot;</span>, <span class="hljs-number">30</span>&#125;<br>fmt.Println(p1 == p2) <span class="hljs-comment">// true</span><br></code></pre></td></tr></table></figure>
 
-<p>然后通过前面的策略允许 <code>ns-a</code> 和 <code>ns-b</code> 之间的流量。</p>
-<hr>
-<p>通过以上配置，您可以灵活控制命名空间之间的网络互通性。根据实际需求选择是否细化到 Pod 标签或端口级别。</p>
+<h2 id="不可比较的情况"><a href="#不可比较的情况" class="headerlink" title="不可比较的情况"></a>不可比较的情况</h2><p>如果struct包含不可比较的字段（如slice、map或function），则不能用<code>==</code>比较：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-keyword">type</span> Data <span class="hljs-keyword">struct</span> &#123;<br>    Values []<span class="hljs-type">int</span><br>&#125;<br><br>d1 := Data&#123;[]<span class="hljs-type">int</span>&#123;<span class="hljs-number">1</span>, <span class="hljs-number">2</span>, <span class="hljs-number">3</span>&#125;&#125;<br>d2 := Data&#123;[]<span class="hljs-type">int</span>&#123;<span class="hljs-number">1</span>, <span class="hljs-number">2</span>, <span class="hljs-number">3</span>&#125;&#125;<br><span class="hljs-comment">// fmt.Println(d1 == d2) // 编译错误：invalid operation</span><br></code></pre></td></tr></table></figure>
+
+<h2 id="替代方案"><a href="#替代方案" class="headerlink" title="替代方案"></a>替代方案</h2><p>对于不可比较的struct，可以使用：</p>
+<ol>
+<li><p><code>reflect.DeepEqual()</code>函数：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs go">fmt.Println(reflect.DeepEqual(d1, d2)) <span class="hljs-comment">// true</span><br></code></pre></td></tr></table></figure>
+</li>
+<li><p>自定义比较函数：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(d Data)</span></span> Equal(other Data) <span class="hljs-type">bool</span> &#123;<br>    <span class="hljs-keyword">if</span> <span class="hljs-built_in">len</span>(d.Values) != <span class="hljs-built_in">len</span>(other.Values) &#123;<br>        <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span><br>    &#125;<br>    <span class="hljs-keyword">for</span> i, v := <span class="hljs-keyword">range</span> d.Values &#123;<br>        <span class="hljs-keyword">if</span> v != other.Values[i] &#123;<br>            <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span><br>        &#125;<br>    &#125;<br>    <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span><br>&#125;<br></code></pre></td></tr></table></figure></li>
+</ol>
+<h2 id="指针比较"><a href="#指针比较" class="headerlink" title="指针比较"></a>指针比较</h2><p>比较struct指针时，比较的是指针值（内存地址）而不是内容：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><code class="hljs go">p3 := &amp;Person&#123;<span class="hljs-string">&quot;Bob&quot;</span>, <span class="hljs-number">25</span>&#125;<br>p4 := &amp;Person&#123;<span class="hljs-string">&quot;Bob&quot;</span>, <span class="hljs-number">25</span>&#125;<br>fmt.Println(p3 == p4) <span class="hljs-comment">// false，因为指向不同内存地址</span><br></code></pre></td></tr></table></figure>
+
+<p>总结：只有当struct的所有字段都是可比较类型时，才能直接用<code>==</code>比较两个struct。</p>
 
                 
               </div>
@@ -323,8 +329,8 @@
 
   <div class="license-box my-3">
     <div class="license-title">
-      <div>k8s网络隔离策略</div>
-      <div>http://guy-18.github.io/2025/07/25/k8s网络隔离策略/</div>
+      <div>在go中比较两个struct</div>
+      <div>http://guy-18.github.io/2025/07/25/在go中比较两个struct/</div>
     </div>
     <div class="license-meta">
       
@@ -368,18 +374,12 @@
                   <article class="post-prev col-6">
                     
                     
-                      <a href="/2025/07/25/%E5%9C%A8go%E4%B8%AD%E6%AF%94%E8%BE%83%E4%B8%A4%E4%B8%AAstruct/" title="在go中比较两个struct">
-                        <i class="iconfont icon-arrowleft"></i>
-                        <span class="hidden-mobile">在go中比较两个struct</span>
-                        <span class="visible-mobile">上一篇</span>
-                      </a>
-                    
                   </article>
                   <article class="post-next col-6">
                     
                     
-                      <a href="/2025/07/25/list-watch%E5%9C%A8%E7%BD%91%E7%BB%9C%E4%B8%AD%E6%96%AD%E5%90%8E%E7%9A%84%E6%81%A2%E5%A4%8D%E6%9C%BA%E5%88%B6/" title="list-watch在网络中断后的恢复机制">
-                        <span class="hidden-mobile">list-watch在网络中断后的恢复机制</span>
+                      <a href="/2025/07/25/k8s%E7%BD%91%E7%BB%9C%E9%9A%94%E7%A6%BB%E7%AD%96%E7%95%A5/" title="k8s网络隔离策略">
+                        <span class="hidden-mobile">k8s网络隔离策略</span>
                         <span class="visible-mobile">下一篇</span>
                         <i class="iconfont icon-arrowright"></i>
                       </a>
