@@ -1,0 +1,794 @@
+
+
+<!DOCTYPE html>
+<html lang="zh-CN" data-default-color-scheme=auto>
+
+
+
+<head>
+  <meta charset="UTF-8">
+
+  <link rel="apple-touch-icon" sizes="76x76" href="/img/fluid.png">
+  <link rel="icon" href="/img/fluid.png">
+  
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, shrink-to-fit=no">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  
+  <meta name="theme-color" content="#2f4154">
+  <meta name="author" content="John">
+  <meta name="keywords" content="">
+  
+    <meta name="description" content="分布式训练的由来好的，我们来彻底解析一下 分布式训练的原理，并以 MNIST手写数字识别 为例，详细解释为什么需要那4个Pod（Chief, PS, Worker）。理解这个，你就能明白Volcano这类调度器的必要性了。  一、为什么需要分布式训练？想象你要训练一个识别手写数字的模型（MNIST）：  单机训练： 你有一台强大的服务器，上面有8块GPU。你把所有训练数据（6万张图片）扔进去，模型">
+<meta property="og:type" content="article">
+<meta property="og:title" content="为什么需要分布式训练">
+<meta property="og:url" content="http://guy-18.github.io/2025/07/26/%E4%B8%BA%E4%BB%80%E4%B9%88%E9%9C%80%E8%A6%81%E5%88%86%E5%B8%83%E5%BC%8F%E8%AE%AD%E7%BB%83/index.html">
+<meta property="og:site_name" content="John的博客">
+<meta property="og:description" content="分布式训练的由来好的，我们来彻底解析一下 分布式训练的原理，并以 MNIST手写数字识别 为例，详细解释为什么需要那4个Pod（Chief, PS, Worker）。理解这个，你就能明白Volcano这类调度器的必要性了。  一、为什么需要分布式训练？想象你要训练一个识别手写数字的模型（MNIST）：  单机训练： 你有一台强大的服务器，上面有8块GPU。你把所有训练数据（6万张图片）扔进去，模型">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2025-07-25T16:05:13.000Z">
+<meta property="article:modified_time" content="2025-07-25T16:06:22.696Z">
+<meta property="article:author" content="John">
+<meta name="twitter:card" content="summary_large_image">
+  
+  
+  
+  <title>为什么需要分布式训练 - John的博客</title>
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/twitter-bootstrap/4.6.1/css/bootstrap.min.css" />
+
+
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/github-markdown-css/4.0.0/github-markdown.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/hint.css/2.7.0/hint.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.css" />
+
+
+
+<!-- 主题依赖的图标库，不要自行修改 -->
+<!-- Do not modify the link that theme dependent icons -->
+
+<link rel="stylesheet" href="//at.alicdn.com/t/c/font_1749284_5i9bdhy70f8.css">
+
+
+
+<link rel="stylesheet" href="//at.alicdn.com/t/c/font_1736178_k526ubmyhba.css">
+
+
+<link  rel="stylesheet" href="/css/main.css" />
+
+
+  <link id="highlight-css" rel="stylesheet" href="/css/highlight.css" />
+  
+    <link id="highlight-css-dark" rel="stylesheet" href="/css/highlight-dark.css" />
+  
+
+
+
+
+  <script id="fluid-configs">
+    var Fluid = window.Fluid || {};
+    Fluid.ctx = Object.assign({}, Fluid.ctx)
+    var CONFIG = {"hostname":"guy-18.github.io","root":"/","version":"1.9.8","typing":{"enable":true,"typeSpeed":70,"cursorChar":"_","loop":false,"scope":[]},"anchorjs":{"enable":true,"element":"h1,h2,h3,h4,h5,h6","placement":"left","visible":"hover","icon":""},"progressbar":{"enable":true,"height_px":3,"color":"#29d","options":{"showSpinner":false,"trickleSpeed":100}},"code_language":{"enable":true,"default":"TEXT"},"copy_btn":true,"image_caption":{"enable":true},"image_zoom":{"enable":true,"img_url_replace":["",""]},"toc":{"enable":true,"placement":"right","headingSelector":"h1,h2,h3,h4,h5,h6","collapseDepth":0},"lazyload":{"enable":true,"loading_img":"/img/loading.gif","onlypost":false,"offset_factor":2},"web_analytics":{"enable":false,"follow_dnt":true,"baidu":null,"google":{"measurement_id":null},"tencent":{"sid":null,"cid":null},"leancloud":{"app_id":null,"app_key":null,"server_url":null,"path":"window.location.pathname","ignore_local":false},"umami":{"src":null,"website_id":null,"domains":null,"start_time":"2024-01-01T00:00:00.000Z","token":null,"api_server":null}},"search_path":"/local-search.xml","include_content_in_search":true};
+
+    if (CONFIG.web_analytics.follow_dnt) {
+      var dntVal = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+      Fluid.ctx.dnt = dntVal && (dntVal.startsWith('1') || dntVal.startsWith('yes') || dntVal.startsWith('on'));
+    }
+  </script>
+  <script  src="/js/utils.js" ></script>
+  <script  src="/js/color-schema.js" ></script>
+  
+
+
+  
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+
+<body>
+  
+
+  <header>
+    
+
+<div class="header-inner" style="height: 70vh;">
+  <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
+  <div class="container">
+    <a class="navbar-brand" href="/">
+      <strong>Fluid</strong>
+    </a>
+
+    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
+            data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <div class="animated-icon"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Collapsible content -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ml-auto text-center">
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/" target="_self">
+                <i class="iconfont icon-home-fill"></i>
+                <span>首页</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/archives/" target="_self">
+                <i class="iconfont icon-archive-fill"></i>
+                <span>归档</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/categories/" target="_self">
+                <i class="iconfont icon-category-fill"></i>
+                <span>分类</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/tags/" target="_self">
+                <i class="iconfont icon-tags-fill"></i>
+                <span>标签</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/about/" target="_self">
+                <i class="iconfont icon-user-fill"></i>
+                <span>关于</span>
+              </a>
+            </li>
+          
+        
+        
+          <li class="nav-item" id="search-btn">
+            <a class="nav-link" target="_self" href="javascript:;" data-toggle="modal" data-target="#modalSearch" aria-label="Search">
+              <i class="iconfont icon-search"></i>
+            </a>
+          </li>
+          
+        
+        
+          <li class="nav-item" id="color-toggle-btn">
+            <a class="nav-link" target="_self" href="javascript:;" aria-label="Color Toggle">
+              <i class="iconfont icon-dark" id="color-toggle-icon"></i>
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+  
+
+<div id="banner" class="banner" parallax=true
+     style="background: url('/img/default.png') no-repeat center center; background-size: cover;">
+  <div class="full-bg-img">
+    <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
+      <div class="banner-text text-center fade-in-up">
+        <div class="h2">
+          
+            <span id="subtitle" data-typed-text="为什么需要分布式训练"></span>
+          
+        </div>
+
+        
+          
+  <div class="mt-3">
+    
+    
+      <span class="post-meta">
+        <i class="iconfont icon-date-fill" aria-hidden="true"></i>
+        <time datetime="2025-07-26 00:05" pubdate>
+          2025年7月26日 凌晨
+        </time>
+      </span>
+    
+  </div>
+
+  <div class="mt-1">
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-chart"></i>
+        
+          2.3k 字
+        
+      </span>
+    
+
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-clock-fill"></i>
+        
+        
+        
+          20 分钟
+        
+      </span>
+    
+
+    
+    
+  </div>
+
+
+        
+      </div>
+
+      
+    </div>
+  </div>
+</div>
+
+</div>
+
+  </header>
+
+  <main>
+    
+      
+
+<div class="container-fluid nopadding-x">
+  <div class="row nomargin-x">
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+
+    </div>
+
+    <div class="col-lg-8 nopadding-x-md">
+      <div class="container nopadding-x-md" id="board-ctn">
+        <div id="board">
+          <article class="post-content mx-auto">
+            <h1 id="seo-header">为什么需要分布式训练</h1>
+            
+            
+              <div class="markdown-body">
+                
+                <h1 id="分布式训练的由来"><a href="#分布式训练的由来" class="headerlink" title="分布式训练的由来"></a>分布式训练的由来</h1><p>好的，我们来彻底解析一下 <strong>分布式训练的原理</strong>，并以 <strong>MNIST手写数字识别</strong> 为例，详细解释为什么需要那4个Pod（Chief, PS, Worker）。理解这个，你就能明白Volcano这类调度器的必要性了。</p>
+<hr>
+<h3 id="一、为什么需要分布式训练？"><a href="#一、为什么需要分布式训练？" class="headerlink" title="一、为什么需要分布式训练？"></a>一、为什么需要分布式训练？</h3><p>想象你要训练一个识别手写数字的模型（MNIST）：</p>
+<ul>
+<li><strong>单机训练：</strong> 你有一台强大的服务器，上面有8块GPU。你把所有训练数据（6万张图片）扔进去，模型在8块GPU上并行计算（数据并行），速度很快。</li>
+<li><strong>现实限制：</strong><ul>
+<li>模型越来越大（如GPT-3），参数达到千亿级别，单台机器装不下。</li>
+<li>训练数据量爆炸（TB&#x2F;PB级），单机读取和处理太慢。</li>
+<li>单台机器的GPU数量有上限（比如8块、16块），无法满足超大规模训练需求。</li>
+</ul>
+</li>
+<li><strong>解决方案：分布式训练！</strong> 把计算任务（模型、数据）拆分到<strong>多台机器（多个Pod）</strong> 上协同工作，共同完成训练。</li>
+</ul>
+<hr>
+<h3 id="二、分布式训练的核心原理：分而治之"><a href="#二、分布式训练的核心原理：分而治之" class="headerlink" title="二、分布式训练的核心原理：分而治之"></a>二、分布式训练的核心原理：分而治之</h3><p>核心思想是将<strong>模型参数（Parameters）</strong> 和<strong>训练数据（Training Data）</strong> 的存储与计算分散到多个节点上，并通过<strong>网络通信</strong>来协调它们。主要有两种主流架构：</p>
+<h4 id="1-Parameter-Server-PS-架构-TensorFlow-早期常用"><a href="#1-Parameter-Server-PS-架构-TensorFlow-早期常用" class="headerlink" title="1. Parameter Server (PS) 架构 (TensorFlow 早期常用)"></a>1. Parameter Server (PS) 架构 (TensorFlow 早期常用)</h4>   <pre><code class=" mermaid">graph LR
+  Client[Chief/Client] --&gt;|协调| PS[Parameter Server]
+  PS --&gt;|分发参数/收集梯度| Worker1[Worker 1]
+  PS --&gt;|分发参数/收集梯度| Worker2[Worker 2]
+  PS --&gt;|...| WorkerN[Worker N]
+</code></pre>
+
+<ul>
+<li><strong>Parameter Server (PS):</strong><ul>
+<li><strong>角色：</strong> 中央仓库。</li>
+<li><strong>职责：</strong> 存储模型的<strong>所有参数（Weights, Biases）</strong>。</li>
+<li><strong>工作流程：</strong><ol>
+<li>接收来自Workers计算得到的<strong>梯度（Gradients）</strong>。</li>
+<li>聚合所有Workers的梯度（通常是求平均）。</li>
+<li>根据聚合后的梯度<strong>更新自己存储的模型参数</strong>。</li>
+<li>将更新后的参数<strong>分发</strong>给所有Workers。</li>
+</ol>
+</li>
+</ul>
+</li>
+<li><strong>Worker:</strong><ul>
+<li><strong>角色：</strong> 计算工人。</li>
+<li><strong>职责：</strong><ol>
+<li>从PS获取<strong>当前最新的模型参数</strong>。</li>
+<li>分配到自己的一小批<strong>训练数据（Batch）</strong>。</li>
+<li>用数据和参数进行<strong>前向传播（Forward Pass）</strong> 计算预测值。</li>
+<li>计算<strong>损失（Loss）</strong>。</li>
+<li>进行<strong>反向传播（Backward Pass）</strong> 计算<strong>梯度（Gradients）</strong>。</li>
+<li>将计算出的梯度<strong>发送</strong>给PS。</li>
+</ol>
+</li>
+</ul>
+</li>
+<li><strong>Chief &#x2F; Master &#x2F; Client (有时与某个Worker合并):</strong><ul>
+<li><strong>角色：</strong> 工头&#x2F;管理员。</li>
+<li><strong>职责：</strong><ul>
+<li>初始化模型参数（通常放在PS上）。</li>
+<li>管理训练流程（开始、停止、设置epoch数等）。</li>
+<li>协调Worker和PS的工作（非绝对必要，但常见）。</li>
+<li>负责做<strong>评估（Evaluation）</strong>、保存<strong>检查点（Checkpoint）</strong>、写<strong>日志（Logging）</strong> 等管理任务。</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong>关键点：</strong><ul>
+<li>PS 是瓶颈：所有梯度汇聚和参数更新都经过它，网络和计算压力大。</li>
+<li>需要<strong>同步（Synchronous）</strong>：通常等所有Worker都完成一个Batch的计算并发送梯度给PS后，PS才进行更新和分发。这保证了所有Worker在同一时间点用的是<strong>相同版本的参数</strong>。</li>
+<li><strong>“All-or-Nothing” 需求：</strong> 如果任何一个Worker或PS挂掉，整个训练过程就会卡住或出错，因为梯度聚合不完整或参数无法更新分发。这就是为什么需要Gang Scheduling保证它们同时启动。</li>
+</ul>
+</li>
+</ul>
+<h4 id="2-All-Reduce-架构-PyTorch-DDP-Horovod-TensorFlow-MirroredStrategy-常用"><a href="#2-All-Reduce-架构-PyTorch-DDP-Horovod-TensorFlow-MirroredStrategy-常用" class="headerlink" title="2. All-Reduce 架构 (PyTorch DDP, Horovod, TensorFlow MirroredStrategy 常用)"></a>2. All-Reduce 架构 (PyTorch DDP, Horovod, TensorFlow MirroredStrategy 常用)</h4>   <pre><code class=" mermaid">graph LR
+  Worker1[Worker 1] -- 梯度 --&gt; Ring
+  Worker2[Worker 2] -- 梯度 --&gt; Ring
+  Worker3[Worker 3] -- 梯度 --&gt; Ring
+  WorkerN[Worker N] -- 梯度 --&gt; Ring
+  Ring[通信环 All-Reduce]
+</code></pre>
+
+<ul>
+<li><strong>核心思想：</strong> 消除中心化的PS。<strong>每个Worker</strong>都存储<strong>一份完整的模型副本</strong>。</li>
+<li><strong>工作流程：</strong><ol>
+<li>每个Worker用自己的Batch数据独立进行<strong>前向传播</strong>和<strong>反向传播</strong>，计算出<strong>本地梯度</strong>。</li>
+<li>所有Worker使用高效的<strong>All-Reduce</strong>通信原语（如Ring-AllReduce）进行通信。<ul>
+<li><strong>目标：</strong> 让<strong>每个Worker</strong>都得到<strong>所有Worker梯度的平均值</strong>。</li>
+</ul>
+</li>
+<li>每个Worker<strong>独立地用这个平均梯度更新自己本地的模型参数</strong>。</li>
+</ol>
+</li>
+<li><strong>优势：</strong><ul>
+<li>消除了PS瓶颈，通信负载更均衡地分散到所有Worker节点上。</li>
+<li>通常比PS架构具有更好的扩展性和性能，尤其在高带宽网络环境下。</li>
+</ul>
+</li>
+<li><strong>关键点：</strong><ul>
+<li>仍然需要<strong>同步：</strong> All-Reduce操作需要所有Worker都参与才能完成。</li>
+<li><strong>“All-or-Nothing” 需求依然存在：</strong> 如果一个Worker挂掉，All-Reduce操作就无法完成，整个训练就会卡住。</li>
+<li><strong>Chief&#x2F;Master角色：</strong> 通常仍然需要一个节点（或指定一个Worker兼任）来负责全局协调（启动、监控、保存Checkpoint等）。</li>
+</ul>
+</li>
+</ul>
+<hr>
+<h3 id="三、聚焦MNIST：为什么需要4个Pod？"><a href="#三、聚焦MNIST：为什么需要4个Pod？" class="headerlink" title="三、聚焦MNIST：为什么需要4个Pod？"></a>三、聚焦MNIST：为什么需要4个Pod？</h3><p>现在回到你看到的MNIST分布式TensorFlow训练例子（假设使用的是PS架构）：</p>
+<ol>
+<li><p><strong><code>1 x Chief Pod</code>：</strong></p>
+<ul>
+<li><strong>职责：</strong> 这是训练的总指挥。它负责：<ul>
+<li>定义模型结构。</li>
+<li>初始化全局参数（并告诉PS初始值是什么）。</li>
+<li>启动训练任务。</li>
+<li>监控训练进度（如计算全局Loss，虽然Loss计算通常也分布在Worker上）。</li>
+<li>保存训练好的模型检查点（Checkpoint）。</li>
+<li>负责最终的模型评估（如果需要）。</li>
+</ul>
+</li>
+<li><strong>资源：</strong> 可能不需要GPU，或者只需要少量资源用于管理任务。</li>
+</ul>
+</li>
+<li><p><strong><code>1 x Parameter Server (PS) Pod</code>：</strong></p>
+<ul>
+<li><strong>职责：</strong> 这是模型的中央仓库。它只做一件事：<ul>
+<li>存储模型的所有参数（权重W和偏置b）。</li>
+<li>接收来自Workers的梯度。</li>
+<li>聚合梯度（求平均）。</li>
+<li>用聚合后的梯度更新参数。</li>
+<li>把更新后的参数发送给Workers。</li>
+</ul>
+</li>
+<li><strong>资源：</strong> 对计算能力要求不高（主要是存储和网络IO），但需要足够内存存储模型参数。对于MNIST这种小模型，CPU足够；对于大模型，PS也可能需要高内存。</li>
+</ul>
+</li>
+<li><p><strong><code>2 x Worker Pod</code>：</strong></p>
+<ul>
+<li><strong>职责：</strong> 这是干重活的计算单元。每个Worker：<ul>
+<li>从PS获取最新的模型参数。</li>
+<li>分配到自己的<strong>一部分MNIST训练数据</strong>（比如总6万张图，Worker1拿前3万张的一个Batch，Worker2拿后3万张的一个Batch）。</li>
+<li>用自己的数据和参数进行<strong>前向传播</strong>（计算预测值）。</li>
+<li>计算<strong>损失</strong>（预测值 vs 真实标签）。</li>
+<li>进行<strong>反向传播</strong>（计算梯度：模型参数应该如何调整才能减少损失）。</li>
+<li>将计算出的梯度发送给PS。</li>
+</ul>
+</li>
+<li><strong>资源：</strong> 需要主要的计算资源（GPU）来进行前向和反向传播。MNIST模型小，1个Worker也能跑，但2个Worker演示了并行。实际大规模训练可能需要几十上百个Worker。</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h3 id="四、为什么这4个Pod必须“同生共死”（Gang-Scheduling）？"><a href="#四、为什么这4个Pod必须“同生共死”（Gang-Scheduling）？" class="headerlink" title="四、为什么这4个Pod必须“同生共死”（Gang Scheduling）？"></a>四、为什么这4个Pod必须“同生共死”（Gang Scheduling）？</h3><ol>
+<li><p><strong>同步需求：</strong></p>
+<ul>
+<li><strong>PS架构：</strong> PS需要收集<strong>所有Worker</strong>的梯度才能进行参数更新。如果Worker2没启动，Worker1的梯度发到PS，PS会一直等待Worker2的梯度（或者超时失败）。训练无法进行。</li>
+<li><strong>All-Reduce架构：</strong> All-Reduce操作需要<strong>所有Worker</strong>参与通信。少一个Worker，通信环就断了，操作无法完成。训练卡死。</li>
+<li><strong>Chief的协调：</strong> Chief需要知道所有Worker和PS的状态来管理整个训练生命周期。如果部分节点缺失，Chief无法正确启动或监控训练。</li>
+</ul>
+</li>
+<li><p><strong>资源死锁：</strong></p>
+<ul>
+<li>假设集群资源紧张。如果允许部分启动：<ul>
+<li>Chief和PS先启动了。</li>
+<li>Worker1启动了，占用了最后一块空闲GPU。</li>
+<li>Worker2因为没GPU卡在Pending。</li>
+</ul>
+</li>
+<li>结果：Chief、PS、Worker1在运行，但它们<strong>什么有用的训练都做不了</strong>（因为Worker2缺失导致同步失败）。它们占着资源（尤其是Worker1的GPU）却无法完成工作。Worker2在等GPU，GPU被一个无法工作的Worker1占着。这就是<strong>资源死锁</strong>。</li>
+</ul>
+</li>
+<li><p><strong>浪费资源：</strong></p>
+<ul>
+<li>如上所述，部分启动的Pod消耗着CPU、内存、GPU、网络带宽，却无法推进训练任务，纯粹是浪费钱（云环境）或计算资源。</li>
+</ul>
+</li>
+<li><p><strong>框架逻辑：</strong></p>
+<ul>
+<li>TensorFlow&#x2F;PyTorch等分布式训练框架的设计逻辑就是基于所有节点都可用。它们内部的通信库（如gRPC, NCCL）会尝试连接配置中的所有节点。节点缺失会导致连接失败、超时、异常，最终导致训练作业失败。</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h3 id="五、总结：分布式训练与Volcano的完美契合"><a href="#五、总结：分布式训练与Volcano的完美契合" class="headerlink" title="五、总结：分布式训练与Volcano的完美契合"></a>五、总结：分布式训练与Volcano的完美契合</h3><ul>
+<li><strong>分布式训练的本质</strong> 是将大型模型&#x2F;数据的计算任务拆分到多个节点协同完成，核心是<strong>同步</strong>（参数&#x2F;梯度一致性）。</li>
+<li><strong>PS或All-Reduce架构</strong> 是实现同步的不同方式，但都<strong>强依赖所有计算节点（Worker）同时在线工作</strong>。管理节点（Chief）和存储节点（PS，如果存在）也至关重要。</li>
+<li><strong>MNIST的4个Pod示例</strong> 清晰地展示了分布式训练中角色的划分（Chief管理， PS存储， Worker计算）和最小的并行规模（2 Workers）。</li>
+<li><strong>“All-or-Nothing”需求</strong> 是分布式训练内在特性导致的：部分成功等于整体失败，还会导致资源死锁和浪费。</li>
+<li><strong>Volcano的价值</strong> 正是通过<code>PodGroup</code>和<code>minAvailable</code>等机制，实现<strong>Gang Scheduling</strong>，确保分布式训练作业所需的所有Pod作为一个整体，要么全部成功调度并启动，要么都不启动。这完美解决了原生Kubernetes调度器在批量调度和原子性保障上的缺陷，为AI&#x2F;大数据等分布式工作负载提供了可靠高效的调度基础。</li>
+</ul>
+<p><strong>理解了这个原理，你再回头看Volcano的调度策略（如预留资源、一次性绑定、优先级&#x2F;抢占为完整作业服务等），就会豁然开朗：它的每一个核心设计几乎都是为了解决分布式训练（以及类似批处理作业）的这些独特挑战而生的。</strong></p>
+
+                
+              </div>
+            
+            <hr/>
+            <div>
+              <div class="post-metas my-3">
+  
+  
+</div>
+
+
+              
+  
+
+  <div class="license-box my-3">
+    <div class="license-title">
+      <div>为什么需要分布式训练</div>
+      <div>http://guy-18.github.io/2025/07/26/为什么需要分布式训练/</div>
+    </div>
+    <div class="license-meta">
+      
+        <div class="license-meta-item">
+          <div>作者</div>
+          <div>John</div>
+        </div>
+      
+      
+        <div class="license-meta-item license-meta-date">
+          <div>发布于</div>
+          <div>2025年7月26日</div>
+        </div>
+      
+      
+      
+        <div class="license-meta-item">
+          <div>许可协议</div>
+          <div>
+            
+              
+              
+                <a class="print-no-link" target="_blank" href="https://creativecommons.org/licenses/by/4.0/">
+                  <span class="hint--top hint--rounded" aria-label="BY - 署名">
+                    <i class="iconfont icon-cc-by"></i>
+                  </span>
+                </a>
+              
+            
+          </div>
+        </div>
+      
+    </div>
+    <div class="license-icon iconfont"></div>
+  </div>
+
+
+
+              
+                <div class="post-prevnext my-3">
+                  <article class="post-prev col-6">
+                    
+                    
+                  </article>
+                  <article class="post-next col-6">
+                    
+                    
+                      <a href="/2025/07/25/%E4%B8%BA%E4%BB%80%E4%B9%88%E9%9C%80%E8%A6%81%E6%89%B9%E9%87%8F%E8%B0%83%E5%BA%A6/" title="为什么需要批量调度">
+                        <span class="hidden-mobile">为什么需要批量调度</span>
+                        <span class="visible-mobile">下一篇</span>
+                        <i class="iconfont icon-arrowright"></i>
+                      </a>
+                    
+                  </article>
+                </div>
+              
+            </div>
+
+            
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+  <aside class="sidebar" style="margin-left: -1rem">
+    <div id="toc">
+  <p class="toc-header">
+    <i class="iconfont icon-list"></i>
+    <span>目录</span>
+  </p>
+  <div class="toc-body" id="toc-body"></div>
+</div>
+
+
+
+  </aside>
+
+
+    </div>
+  </div>
+</div>
+
+
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+
+
+
+
+    
+
+    
+      <a id="scroll-top-button" aria-label="TOP" href="#" role="button">
+        <i class="iconfont icon-arrowup" aria-hidden="true"></i>
+      </a>
+    
+
+    
+      <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header text-center">
+        <h4 class="modal-title w-100 font-weight-bold">搜索</h4>
+        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body mx-3">
+        <div class="md-form mb-5">
+          <input type="text" id="local-search-input" class="form-control validate">
+          <label data-error="x" data-success="v" for="local-search-input">关键词</label>
+        </div>
+        <div class="list-group" id="local-search-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+    
+
+    
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+  
+    <div class="footer-content">
+       <a href="https://hexo.io" target="_blank" rel="nofollow noopener"><span>Hexo</span></a> <i class="iconfont icon-love"></i> <a href="https://github.com/fluid-dev/hexo-theme-fluid" target="_blank" rel="nofollow noopener"><span>Fluid</span></a> 
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+
+  <!-- Scripts -->
+  
+  <script  src="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.js" ></script>
+  <link  rel="stylesheet" href="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.css" />
+
+  <script>
+    NProgress.configure({"showSpinner":false,"trickleSpeed":100})
+    NProgress.start()
+    window.addEventListener('load', function() {
+      NProgress.done();
+    })
+  </script>
+
+
+<script  src="https://lib.baomitu.com/jquery/3.6.4/jquery.min.js" ></script>
+<script  src="https://lib.baomitu.com/twitter-bootstrap/4.6.1/js/bootstrap.min.js" ></script>
+<script  src="/js/events.js" ></script>
+<script  src="/js/plugins.js" ></script>
+
+
+  <script  src="https://lib.baomitu.com/typed.js/2.0.12/typed.min.js" ></script>
+  <script>
+    (function (window, document) {
+      var typing = Fluid.plugins.typing;
+      var subtitle = document.getElementById('subtitle');
+      if (!subtitle || !typing) {
+        return;
+      }
+      var text = subtitle.getAttribute('data-typed-text');
+      
+        typing(text);
+      
+    })(window, document);
+  </script>
+
+
+
+
+  
+    <script  src="/js/img-lazyload.js" ></script>
+  
+
+
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/tocbot/4.20.1/tocbot.min.js', function() {
+    var toc = jQuery('#toc');
+    if (toc.length === 0 || !window.tocbot) { return; }
+    var boardCtn = jQuery('#board-ctn');
+    var boardTop = boardCtn.offset().top;
+
+    window.tocbot.init(Object.assign({
+      tocSelector     : '#toc-body',
+      contentSelector : '.markdown-body',
+      linkClass       : 'tocbot-link',
+      activeLinkClass : 'tocbot-active-link',
+      listClass       : 'tocbot-list',
+      isCollapsedClass: 'tocbot-is-collapsed',
+      collapsibleClass: 'tocbot-is-collapsible',
+      scrollSmooth    : true,
+      includeTitleTags: true,
+      headingsOffset  : -boardTop,
+    }, CONFIG.toc));
+    if (toc.find('.toc-list-item').length > 0) {
+      toc.css('visibility', 'visible');
+    }
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('tocbot' in window) {
+        tocbot.refresh();
+        var toc = jQuery('#toc');
+        if (toc.length === 0 || !tocbot) {
+          return;
+        }
+        if (toc.find('.toc-list-item').length > 0) {
+          toc.css('visibility', 'visible');
+        }
+      }
+    });
+  });
+</script>
+
+
+  <script src=https://lib.baomitu.com/clipboard.js/2.0.11/clipboard.min.js></script>
+
+  <script>Fluid.plugins.codeWidget();</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/anchor-js/5.0.0/anchor.min.js', function() {
+    window.anchors.options = {
+      placement: CONFIG.anchorjs.placement,
+      visible  : CONFIG.anchorjs.visible
+    };
+    if (CONFIG.anchorjs.icon) {
+      window.anchors.options.icon = CONFIG.anchorjs.icon;
+    }
+    var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+    var res = [];
+    for (var item of el) {
+      res.push('.markdown-body > ' + item.trim());
+    }
+    if (CONFIG.anchorjs.placement === 'left') {
+      window.anchors.options.class = 'anchorjs-link-left';
+    }
+    window.anchors.add(res.join(', '));
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('anchors' in window) {
+        anchors.removeAll();
+        var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+        var res = [];
+        for (var item of el) {
+          res.push('.markdown-body > ' + item.trim());
+        }
+        if (CONFIG.anchorjs.placement === 'left') {
+          anchors.options.class = 'anchorjs-link-left';
+        }
+        anchors.add(res.join(', '));
+      }
+    });
+  });
+</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.js', function() {
+    Fluid.plugins.fancyBox();
+  });
+</script>
+
+
+  <script>Fluid.plugins.imageCaption();</script>
+
+  <script  src="/js/local-search.js" ></script>
+
+
+
+
+
+<!-- 主题的启动项，将它保持在最底部 -->
+<!-- the boot of the theme, keep it at the bottom -->
+<script  src="/js/boot.js" ></script>
+
+
+  
+
+  <noscript>
+    <div class="noscript-warning">博客在允许 JavaScript 运行的环境下浏览效果更佳</div>
+  </noscript>
+</body>
+</html>

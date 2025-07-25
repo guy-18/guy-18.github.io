@@ -19,21 +19,21 @@
   <meta name="author" content="John">
   <meta name="keywords" content="">
   
-    <meta name="description" content="在Go中比较两个Struct在Go语言中，两个struct是否可以用&#x3D;&#x3D;操作符进行比较取决于struct的组成。 可比较的情况当struct满足以下条件时，可以直接用&#x3D;&#x3D;比较：  所有字段都是可比较的类型：  基本类型（int, float, string等） 指针 数组（元素类型可比较） 其他可比较的struct channel   不包含不可比较的字段：  slice map function">
+    <meta name="description" content="为什么需要批量调度？以 MNIST 手写体数字识别项目为例让我们以经典的 MNIST 手写体数字识别项目（使用 TensorFlow 分布式训练）为例，说明为什么需要专门的批量调度器。这是一个典型的机器学习训练场景，能清晰展示原生 Kubernetes 调度器的局限。  场景描述：分布式 TensorFlow MNIST 训练假设我们需要训练一个识别手写数字的模型：  任务组成： 1个 Chief">
 <meta property="og:type" content="article">
-<meta property="og:title" content="在go中比较两个struct">
-<meta property="og:url" content="http://guy-18.github.io/2025/07/25/%E5%9C%A8go%E4%B8%AD%E6%AF%94%E8%BE%83%E4%B8%A4%E4%B8%AAstruct/index.html">
+<meta property="og:title" content="为什么需要批量调度">
+<meta property="og:url" content="http://guy-18.github.io/2025/07/25/%E4%B8%BA%E4%BB%80%E4%B9%88%E9%9C%80%E8%A6%81%E6%89%B9%E9%87%8F%E8%B0%83%E5%BA%A6/index.html">
 <meta property="og:site_name" content="John的博客">
-<meta property="og:description" content="在Go中比较两个Struct在Go语言中，两个struct是否可以用&#x3D;&#x3D;操作符进行比较取决于struct的组成。 可比较的情况当struct满足以下条件时，可以直接用&#x3D;&#x3D;比较：  所有字段都是可比较的类型：  基本类型（int, float, string等） 指针 数组（元素类型可比较） 其他可比较的struct channel   不包含不可比较的字段：  slice map function">
+<meta property="og:description" content="为什么需要批量调度？以 MNIST 手写体数字识别项目为例让我们以经典的 MNIST 手写体数字识别项目（使用 TensorFlow 分布式训练）为例，说明为什么需要专门的批量调度器。这是一个典型的机器学习训练场景，能清晰展示原生 Kubernetes 调度器的局限。  场景描述：分布式 TensorFlow MNIST 训练假设我们需要训练一个识别手写数字的模型：  任务组成： 1个 Chief">
 <meta property="og:locale" content="zh_CN">
-<meta property="article:published_time" content="2025-07-25T13:32:10.000Z">
-<meta property="article:modified_time" content="2025-07-25T13:32:49.185Z">
+<meta property="article:published_time" content="2025-07-25T15:42:11.000Z">
+<meta property="article:modified_time" content="2025-07-25T15:42:34.797Z">
 <meta property="article:author" content="John">
 <meta name="twitter:card" content="summary_large_image">
   
   
   
-  <title>在go中比较两个struct - John的博客</title>
+  <title>为什么需要批量调度 - John的博客</title>
 
   <link  rel="stylesheet" href="https://lib.baomitu.com/twitter-bootstrap/4.6.1/css/bootstrap.min.css" />
 
@@ -199,7 +199,7 @@
       <div class="banner-text text-center fade-in-up">
         <div class="h2">
           
-            <span id="subtitle" data-typed-text="在go中比较两个struct"></span>
+            <span id="subtitle" data-typed-text="为什么需要批量调度"></span>
           
         </div>
 
@@ -210,7 +210,7 @@
     
       <span class="post-meta">
         <i class="iconfont icon-date-fill" aria-hidden="true"></i>
-        <time datetime="2025-07-25 21:32" pubdate>
+        <time datetime="2025-07-25 23:42" pubdate>
           2025年7月25日 晚上
         </time>
       </span>
@@ -222,7 +222,7 @@
       <span class="post-meta mr-2">
         <i class="iconfont icon-chart"></i>
         
-          341 字
+          1.2k 字
         
       </span>
     
@@ -233,7 +233,7 @@
         
         
         
-          3 分钟
+          10 分钟
         
       </span>
     
@@ -270,48 +270,161 @@
       <div class="container nopadding-x-md" id="board-ctn">
         <div id="board">
           <article class="post-content mx-auto">
-            <h1 id="seo-header">在go中比较两个struct</h1>
+            <h1 id="seo-header">为什么需要批量调度</h1>
             
             
               <div class="markdown-body">
                 
-                <h1 id="在Go中比较两个Struct"><a href="#在Go中比较两个Struct" class="headerlink" title="在Go中比较两个Struct"></a>在Go中比较两个Struct</h1><p>在Go语言中，两个struct是否可以用<code>==</code>操作符进行比较取决于struct的组成。</p>
-<h2 id="可比较的情况"><a href="#可比较的情况" class="headerlink" title="可比较的情况"></a>可比较的情况</h2><p>当struct满足以下条件时，可以直接用<code>==</code>比较：</p>
-<ol>
-<li><p><strong>所有字段都是可比较的类型</strong>：</p>
+                <h3 id="为什么需要批量调度？以-MNIST-手写体数字识别项目为例"><a href="#为什么需要批量调度？以-MNIST-手写体数字识别项目为例" class="headerlink" title="为什么需要批量调度？以 MNIST 手写体数字识别项目为例"></a>为什么需要批量调度？以 MNIST 手写体数字识别项目为例</h3><p>让我们以经典的 <strong>MNIST 手写体数字识别项目</strong>（使用 TensorFlow 分布式训练）为例，说明为什么需要专门的批量调度器。这是一个典型的机器学习训练场景，能清晰展示原生 Kubernetes 调度器的局限。</p>
+<hr>
+<h3 id="场景描述：分布式-TensorFlow-MNIST-训练"><a href="#场景描述：分布式-TensorFlow-MNIST-训练" class="headerlink" title="场景描述：分布式 TensorFlow MNIST 训练"></a>场景描述：分布式 TensorFlow MNIST 训练</h3><p>假设我们需要训练一个识别手写数字的模型：</p>
 <ul>
-<li>基本类型（int, float, string等）</li>
-<li>指针</li>
-<li>数组（元素类型可比较）</li>
-<li>其他可比较的struct</li>
-<li>channel</li>
+<li><strong>任务组成</strong>：<ul>
+<li>1个 <strong>Chief 节点</strong>（负责协调训练）</li>
+<li>1个 <strong>Parameter Server</strong>（存储模型参数）</li>
+<li>2个 <strong>Worker 节点</strong>（执行计算任务）</li>
 </ul>
 </li>
-<li><p><strong>不包含不可比较的字段</strong>：</p>
-<ul>
-<li>slice</li>
-<li>map</li>
-<li>function</li>
+<li><strong>资源需求</strong>：每个 Pod 需要 1 块 GPU</li>
+<li><strong>关键要求</strong>：<strong>所有 4 个 Pod 必须同时启动</strong>，任何一个失败都会导致整个训练失败</li>
+</ul>
+<pre><code class=" mermaid">graph LR
+    Chief[Chief节点] --&gt;|协调| PS[Parameter Server]
+    PS --&gt;|参数同步| Worker1[Worker 1]
+    PS --&gt;|参数同步| Worker2[Worker 2]
+</code></pre>
+
+<hr>
+<h3 id="原生-Kubernetes-调度器的问题"><a href="#原生-Kubernetes-调度器的问题" class="headerlink" title="原生 Kubernetes 调度器的问题"></a>原生 Kubernetes 调度器的问题</h3><h4 id="场景-1：资源不足时的部分启动（最危险的情况）"><a href="#场景-1：资源不足时的部分启动（最危险的情况）" class="headerlink" title="场景 1：资源不足时的部分启动（最危险的情况）"></a>场景 1：资源不足时的部分启动（最危险的情况）</h4><p>假设集群有 3 个 GPU 节点，但每个节点<strong>只剩 1 块空闲 GPU</strong>：</p>
+<ol>
+<li>提交包含 4 个 Pod 的 Job</li>
+<li>原生调度器行为：<ul>
+<li>Pod1 (Chief) → 调度到 Node1 ✅</li>
+<li>Pod2 (PS) → 调度到 Node2 ✅</li>
+<li>Pod3 (Worker1) → 调度到 Node3 ✅</li>
+<li>Pod4 (Worker2) → <strong>无可用资源，卡在 Pending</strong> ❌</li>
 </ul>
 </li>
 </ol>
-<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-keyword">type</span> Person <span class="hljs-keyword">struct</span> &#123;<br>    Name <span class="hljs-type">string</span><br>    Age  <span class="hljs-type">int</span><br>&#125;<br><br>p1 := Person&#123;<span class="hljs-string">&quot;Alice&quot;</span>, <span class="hljs-number">30</span>&#125;<br>p2 := Person&#123;<span class="hljs-string">&quot;Alice&quot;</span>, <span class="hljs-number">30</span>&#125;<br>fmt.Println(p1 == p2) <span class="hljs-comment">// true</span><br></code></pre></td></tr></table></figure>
-
-<h2 id="不可比较的情况"><a href="#不可比较的情况" class="headerlink" title="不可比较的情况"></a>不可比较的情况</h2><p>如果struct包含不可比较的字段（如slice、map或function），则不能用<code>==</code>比较：</p>
-<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-keyword">type</span> Data <span class="hljs-keyword">struct</span> &#123;<br>    Values []<span class="hljs-type">int</span><br>&#125;<br><br>d1 := Data&#123;[]<span class="hljs-type">int</span>&#123;<span class="hljs-number">1</span>, <span class="hljs-number">2</span>, <span class="hljs-number">3</span>&#125;&#125;<br>d2 := Data&#123;[]<span class="hljs-type">int</span>&#123;<span class="hljs-number">1</span>, <span class="hljs-number">2</span>, <span class="hljs-number">3</span>&#125;&#125;<br><span class="hljs-comment">// fmt.Println(d1 == d2) // 编译错误：invalid operation</span><br></code></pre></td></tr></table></figure>
-
-<h2 id="替代方案"><a href="#替代方案" class="headerlink" title="替代方案"></a>替代方案</h2><p>对于不可比较的struct，可以使用：</p>
+<p><strong>灾难性后果</strong>：</p>
+<ul>
+<li>已启动的 3 个 Pod 会不断尝试连接缺失的 Worker2</li>
+<li>5-10 分钟后超时失败（TensorFlow 的 gRPC 连接超时）</li>
+<li><strong>浪费了 3 块 GPU 的计算资源</strong>（按 $0.5&#x2F;GPU小时 计，损失约 $0.025）</li>
+</ul>
+<blockquote>
+<p>💡 <strong>这就是 Gang Scheduling 要解决的 “All-or-Nothing” 问题</strong></p>
+</blockquote>
+<h4 id="场景-2：资源碎片导致的死锁"><a href="#场景-2：资源碎片导致的死锁" class="headerlink" title="场景 2：资源碎片导致的死锁"></a>场景 2：资源碎片导致的死锁</h4><p>假设集群有 4 个节点：</p>
+<ul>
+<li>Node1：剩 2 块 GPU</li>
+<li>Node2：剩 1 块 GPU</li>
+<li>Node3：剩 1 块 GPU</li>
+<li>Node4：剩 0 块 GPU</li>
+</ul>
+<p>同时提交两个 MNIST 作业：</p>
+<ul>
+<li><strong>JobA</strong>：需要 2 个 Worker（共需 3 GPU：Chief+PS+2Worker）</li>
+<li><strong>JobB</strong>：同样需要 3 GPU</li>
+</ul>
+<p>原生调度器可能的调度顺序：</p>
 <ol>
-<li><p><code>reflect.DeepEqual()</code>函数：</p>
-<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs go">fmt.Println(reflect.DeepEqual(d1, d2)) <span class="hljs-comment">// true</span><br></code></pre></td></tr></table></figure>
-</li>
-<li><p>自定义比较函数：</p>
-<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(d Data)</span></span> Equal(other Data) <span class="hljs-type">bool</span> &#123;<br>    <span class="hljs-keyword">if</span> <span class="hljs-built_in">len</span>(d.Values) != <span class="hljs-built_in">len</span>(other.Values) &#123;<br>        <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span><br>    &#125;<br>    <span class="hljs-keyword">for</span> i, v := <span class="hljs-keyword">range</span> d.Values &#123;<br>        <span class="hljs-keyword">if</span> v != other.Values[i] &#123;<br>            <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span><br>        &#125;<br>    &#125;<br>    <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span><br>&#125;<br></code></pre></td></tr></table></figure></li>
+<li>JobA-Chief → Node1（占用 1 GPU）</li>
+<li>JobB-Chief → Node2（占用 1 GPU）</li>
+<li>JobA-PS → Node3（占用 1 GPU）</li>
+<li>JobB-PS → <strong>无节点满足（需 1 GPU，但 Node1 只剩 1 GPU 不满足 PS+Worker 的同节点要求）</strong> ❌</li>
+<li>JobA-Worker1 → Node1（占用最后 1 GPU）</li>
+<li>JobA-Worker2 → <strong>无资源</strong> ❌</li>
 </ol>
-<h2 id="指针比较"><a href="#指针比较" class="headerlink" title="指针比较"></a>指针比较</h2><p>比较struct指针时，比较的是指针值（内存地址）而不是内容：</p>
-<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><code class="hljs go">p3 := &amp;Person&#123;<span class="hljs-string">&quot;Bob&quot;</span>, <span class="hljs-number">25</span>&#125;<br>p4 := &amp;Person&#123;<span class="hljs-string">&quot;Bob&quot;</span>, <span class="hljs-number">25</span>&#125;<br>fmt.Println(p3 == p4) <span class="hljs-comment">// false，因为指向不同内存地址</span><br></code></pre></td></tr></table></figure>
+<p><strong>结果</strong>：</p>
+<ul>
+<li>JobA：缺少 1 Worker</li>
+<li>JobB：缺少 PS 和 Worker</li>
+<li><strong>两个作业都部分运行但无法完成 → 资源死锁</strong></li>
+</ul>
+<hr>
+<h3 id="Volcano-如何解决这些问题"><a href="#Volcano-如何解决这些问题" class="headerlink" title="Volcano 如何解决这些问题"></a>Volcano 如何解决这些问题</h3><h4 id="解决方案-1：Gang-Scheduling（原子性调度）"><a href="#解决方案-1：Gang-Scheduling（原子性调度）" class="headerlink" title="解决方案 1：Gang Scheduling（原子性调度）"></a>解决方案 1：Gang Scheduling（原子性调度）</h4><figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><code class="hljs yaml"><span class="hljs-comment"># Volcano 的 Job 定义</span><br><span class="hljs-attr">apiVersion:</span> <span class="hljs-string">batch.volcano.sh/v1alpha1</span><br><span class="hljs-attr">kind:</span> <span class="hljs-string">Job</span><br><span class="hljs-attr">spec:</span><br>  <span class="hljs-attr">minAvailable:</span> <span class="hljs-number">4</span>  <span class="hljs-comment"># 关键参数！</span><br>  <span class="hljs-attr">tasks:</span><br>    <span class="hljs-bullet">-</span> <span class="hljs-attr">name:</span> <span class="hljs-string">chief</span>  <span class="hljs-comment"># Chief 节点</span><br>      <span class="hljs-attr">replicas:</span> <span class="hljs-number">1</span><br>      <span class="hljs-attr">template:</span> &#123; <span class="hljs-string">...</span> &#125;<br>    <span class="hljs-bullet">-</span> <span class="hljs-attr">name:</span> <span class="hljs-string">ps</span>     <span class="hljs-comment"># Parameter Server</span><br>      <span class="hljs-attr">replicas:</span> <span class="hljs-number">1</span><br>      <span class="hljs-attr">template:</span> &#123; <span class="hljs-string">...</span> &#125;<br>    <span class="hljs-bullet">-</span> <span class="hljs-attr">name:</span> <span class="hljs-string">worker</span> <span class="hljs-comment"># Workers</span><br>      <span class="hljs-attr">replicas:</span> <span class="hljs-number">2</span><br>      <span class="hljs-attr">template:</span> &#123; <span class="hljs-string">...</span> &#125;<br></code></pre></td></tr></table></figure>
 
-<p>总结：只有当struct的所有字段都是可比较类型时，才能直接用<code>==</code>比较两个struct。</p>
+<p><strong>调度过程</strong>：</p>
+<ol>
+<li>调度器检查集群是否有 <strong>4 块可用 GPU</strong></li>
+<li>如果不足 → <strong>整个作业不启动</strong>（避免部分启动）</li>
+<li>如果充足 → <strong>一次性绑定所有 4 个 Pod</strong></li>
+</ol>
+<h4 id="解决方案-2：资源预留-智能分配"><a href="#解决方案-2：资源预留-智能分配" class="headerlink" title="解决方案 2：资源预留 + 智能分配"></a>解决方案 2：资源预留 + 智能分配</h4><p>当多个作业竞争时：</p>
+<ol>
+<li>Volcano 检测到 JobA 和 JobB 都需要 3 GPU</li>
+<li><strong>根据队列优先级</strong>（如 JobA 优先级更高）：<ul>
+<li>为 JobA <strong>预留</strong> Node1(2GPU) + Node3(1GPU)</li>
+<li>一次性启动 JobA 所有 Pod</li>
+</ul>
+</li>
+<li>JobB 等待资源释放</li>
+<li>避免资源碎片死锁</li>
+</ol>
+<hr>
+<h3 id="批量调度的核心价值"><a href="#批量调度的核心价值" class="headerlink" title="批量调度的核心价值"></a>批量调度的核心价值</h3><ol>
+<li><p><strong>避免资源浪费</strong>  </p>
+<ul>
+<li>部分启动的 GPU 作业消耗电力但不产生价值</li>
+<li>按云厂商计费标准：1 块 V100 GPU ≈ $0.5&#x2F;小时<br>→ 部分启动 1 小时 &#x3D; 浪费 $1.5</li>
+</ul>
+</li>
+<li><p><strong>防止分布式系统死锁</strong>  </p>
+<ul>
+<li>TensorFlow&#x2F;PyTorch&#x2F;Spark 等框架要求所有节点同时就绪</li>
+<li>缺失节点会导致整个作业阻塞（而非降级运行）</li>
+</ul>
+</li>
+<li><p><strong>提高集群利用率</strong>  </p>
+<ul>
+<li>通过 Binpack 算法将 Pod 紧密分配到少数节点</li>
+<li>减少资源碎片（如案例中的 “1 GPU 碎片”）</li>
+</ul>
+</li>
+<li><p><strong>支持复杂依赖关系</strong>  </p>
+<pre><code class=" mermaid">graph TD
+  A[数据预处理] --&gt; B[模型训练]
+  B --&gt; C[模型验证]
+  C --&gt; D[模型导出]
+</code></pre>
+<ul>
+<li>Volcano 支持 DAG 工作流调度，确保任务按顺序执行</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h3 id="MNIST-场景中的进阶需求"><a href="#MNIST-场景中的进阶需求" class="headerlink" title="MNIST 场景中的进阶需求"></a>MNIST 场景中的进阶需求</h3><ol>
+<li><p><strong>GPU 拓扑感知调度</strong>  </p>
+<ul>
+<li>当 Worker 需要多 GPU 时：确保 GPU 通过 NVLink 互联</li>
+<li>Volcano 支持根据节点标签调度：<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><code class="hljs yaml"><span class="hljs-attr">topologyPolicy:</span> <span class="hljs-string">BestEffort</span><br><span class="hljs-attr">policies:</span><br>  <span class="hljs-bullet">-</span> <span class="hljs-attr">device:</span> <span class="hljs-string">GPU</span><br>    <span class="hljs-attr">gpuPolicy:</span> <span class="hljs-string">dgx-2</span>  <span class="hljs-comment"># 识别DGX服务器的NVLink拓扑</span><br></code></pre></td></tr></table></figure></li>
+</ul>
+</li>
+<li><p><strong>弹性资源分配</strong>  </p>
+<ul>
+<li>训练中途动态扩展 Worker 数量</li>
+<li>Volcano 支持作业运行时调整 <code>replicas</code></li>
+</ul>
+</li>
+<li><p><strong>队列优先级</strong>  </p>
+<ul>
+<li>生产环境训练任务优先于研发测试任务</li>
+<li>Volcano 的多级队列确保高优先级作业优先获取资源</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h3 id="关键结论：为什么批量调度不可或缺"><a href="#关键结论：为什么批量调度不可或缺" class="headerlink" title="关键结论：为什么批量调度不可或缺"></a>关键结论：为什么批量调度不可或缺</h3><blockquote>
+<p><strong>“在分布式训练中，部分成功就是整体失败”</strong></p>
+</blockquote>
+<p>MNIST 示例揭示了：</p>
+<ul>
+<li>机器学习训练是 <strong>协同作战</strong>，不是单兵作战</li>
+<li>原生调度器的 <strong>“近视眼”决策</strong>（只看单个 Pod）不适合批处理场景</li>
+<li>Volcano 的 <strong>会话式调度</strong>（全局视图）是解决这一问题的本质创新</li>
+</ul>
+<p><strong>学习建议</strong>：理解 Volcano 时，始终问自己：”这个特性如何防止 MNIST 训练中的部分启动问题？” 这将帮助你抓住设计精髓。</p>
 
                 
               </div>
@@ -329,8 +442,8 @@
 
   <div class="license-box my-3">
     <div class="license-title">
-      <div>在go中比较两个struct</div>
-      <div>http://guy-18.github.io/2025/07/25/在go中比较两个struct/</div>
+      <div>为什么需要批量调度</div>
+      <div>http://guy-18.github.io/2025/07/25/为什么需要批量调度/</div>
     </div>
     <div class="license-meta">
       
@@ -374,9 +487,9 @@
                   <article class="post-prev col-6">
                     
                     
-                      <a href="/2025/07/25/%E4%B8%BA%E4%BB%80%E4%B9%88%E9%9C%80%E8%A6%81%E6%89%B9%E9%87%8F%E8%B0%83%E5%BA%A6/" title="为什么需要批量调度">
+                      <a href="/2025/07/26/%E4%B8%BA%E4%BB%80%E4%B9%88%E9%9C%80%E8%A6%81%E5%88%86%E5%B8%83%E5%BC%8F%E8%AE%AD%E7%BB%83/" title="为什么需要分布式训练">
                         <i class="iconfont icon-arrowleft"></i>
-                        <span class="hidden-mobile">为什么需要批量调度</span>
+                        <span class="hidden-mobile">为什么需要分布式训练</span>
                         <span class="visible-mobile">上一篇</span>
                       </a>
                     
@@ -384,8 +497,8 @@
                   <article class="post-next col-6">
                     
                     
-                      <a href="/2025/07/25/k8s%E7%BD%91%E7%BB%9C%E9%9A%94%E7%A6%BB%E7%AD%96%E7%95%A5/" title="k8s网络隔离策略">
-                        <span class="hidden-mobile">k8s网络隔离策略</span>
+                      <a href="/2025/07/25/%E5%9C%A8go%E4%B8%AD%E6%AF%94%E8%BE%83%E4%B8%A4%E4%B8%AAstruct/" title="在go中比较两个struct">
+                        <span class="hidden-mobile">在go中比较两个struct</span>
                         <span class="visible-mobile">下一篇</span>
                         <i class="iconfont icon-arrowright"></i>
                       </a>
