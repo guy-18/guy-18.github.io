@@ -1,0 +1,662 @@
+
+
+<!DOCTYPE html>
+<html lang="zh-CN" data-default-color-scheme=auto>
+
+
+
+<head>
+  <meta charset="UTF-8">
+
+  <link rel="apple-touch-icon" sizes="76x76" href="/img/fluid.png">
+  <link rel="icon" href="/img/fluid.png">
+  
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, shrink-to-fit=no">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  
+  <meta name="theme-color" content="#2f4154">
+  <meta name="author" content="John">
+  <meta name="keywords" content="">
+  
+    <meta name="description" content="list-watch在网络中断后的恢复机制在 Kubernetes 中，List-Watch 机制是客户端（如 kube-apiserver 的客户端）监听资源变化的核心机制。当网络中断后重新连接时，List-Watch 会通过以下方式恢复状态，确保不丢失事件并保持数据一致性：  1. 初始阶段：全量 List 客户端首次启动或需要全量同步时，会先调用 List 获取资源的当前全量状态（所有对象的">
+<meta property="og:type" content="article">
+<meta property="og:title" content="list-watch在网络中断后的恢复机制">
+<meta property="og:url" content="http://guy-18.github.io/2025/07/25/list-watch%E5%9C%A8%E7%BD%91%E7%BB%9C%E4%B8%AD%E6%96%AD%E5%90%8E%E7%9A%84%E6%81%A2%E5%A4%8D%E6%9C%BA%E5%88%B6/index.html">
+<meta property="og:site_name" content="John的博客">
+<meta property="og:description" content="list-watch在网络中断后的恢复机制在 Kubernetes 中，List-Watch 机制是客户端（如 kube-apiserver 的客户端）监听资源变化的核心机制。当网络中断后重新连接时，List-Watch 会通过以下方式恢复状态，确保不丢失事件并保持数据一致性：  1. 初始阶段：全量 List 客户端首次启动或需要全量同步时，会先调用 List 获取资源的当前全量状态（所有对象的">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2025-07-25T11:51:32.000Z">
+<meta property="article:modified_time" content="2025-07-25T11:52:15.111Z">
+<meta property="article:author" content="John">
+<meta name="twitter:card" content="summary_large_image">
+  
+  
+  
+  <title>list-watch在网络中断后的恢复机制 - John的博客</title>
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/twitter-bootstrap/4.6.1/css/bootstrap.min.css" />
+
+
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/github-markdown-css/4.0.0/github-markdown.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/hint.css/2.7.0/hint.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.css" />
+
+
+
+<!-- 主题依赖的图标库，不要自行修改 -->
+<!-- Do not modify the link that theme dependent icons -->
+
+<link rel="stylesheet" href="//at.alicdn.com/t/c/font_1749284_5i9bdhy70f8.css">
+
+
+
+<link rel="stylesheet" href="//at.alicdn.com/t/c/font_1736178_k526ubmyhba.css">
+
+
+<link  rel="stylesheet" href="/css/main.css" />
+
+
+  <link id="highlight-css" rel="stylesheet" href="/css/highlight.css" />
+  
+    <link id="highlight-css-dark" rel="stylesheet" href="/css/highlight-dark.css" />
+  
+
+
+
+
+  <script id="fluid-configs">
+    var Fluid = window.Fluid || {};
+    Fluid.ctx = Object.assign({}, Fluid.ctx)
+    var CONFIG = {"hostname":"guy-18.github.io","root":"/","version":"1.9.8","typing":{"enable":true,"typeSpeed":70,"cursorChar":"_","loop":false,"scope":[]},"anchorjs":{"enable":true,"element":"h1,h2,h3,h4,h5,h6","placement":"left","visible":"hover","icon":""},"progressbar":{"enable":true,"height_px":3,"color":"#29d","options":{"showSpinner":false,"trickleSpeed":100}},"code_language":{"enable":true,"default":"TEXT"},"copy_btn":true,"image_caption":{"enable":true},"image_zoom":{"enable":true,"img_url_replace":["",""]},"toc":{"enable":true,"placement":"right","headingSelector":"h1,h2,h3,h4,h5,h6","collapseDepth":0},"lazyload":{"enable":true,"loading_img":"/img/loading.gif","onlypost":false,"offset_factor":2},"web_analytics":{"enable":false,"follow_dnt":true,"baidu":null,"google":{"measurement_id":null},"tencent":{"sid":null,"cid":null},"leancloud":{"app_id":null,"app_key":null,"server_url":null,"path":"window.location.pathname","ignore_local":false},"umami":{"src":null,"website_id":null,"domains":null,"start_time":"2024-01-01T00:00:00.000Z","token":null,"api_server":null}},"search_path":"/local-search.xml","include_content_in_search":true};
+
+    if (CONFIG.web_analytics.follow_dnt) {
+      var dntVal = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+      Fluid.ctx.dnt = dntVal && (dntVal.startsWith('1') || dntVal.startsWith('yes') || dntVal.startsWith('on'));
+    }
+  </script>
+  <script  src="/js/utils.js" ></script>
+  <script  src="/js/color-schema.js" ></script>
+  
+
+
+  
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+
+<body>
+  
+
+  <header>
+    
+
+<div class="header-inner" style="height: 70vh;">
+  <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
+  <div class="container">
+    <a class="navbar-brand" href="/">
+      <strong>Fluid</strong>
+    </a>
+
+    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
+            data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <div class="animated-icon"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Collapsible content -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ml-auto text-center">
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/" target="_self">
+                <i class="iconfont icon-home-fill"></i>
+                <span>首页</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/archives/" target="_self">
+                <i class="iconfont icon-archive-fill"></i>
+                <span>归档</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/categories/" target="_self">
+                <i class="iconfont icon-category-fill"></i>
+                <span>分类</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/tags/" target="_self">
+                <i class="iconfont icon-tags-fill"></i>
+                <span>标签</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/about/" target="_self">
+                <i class="iconfont icon-user-fill"></i>
+                <span>关于</span>
+              </a>
+            </li>
+          
+        
+        
+          <li class="nav-item" id="search-btn">
+            <a class="nav-link" target="_self" href="javascript:;" data-toggle="modal" data-target="#modalSearch" aria-label="Search">
+              <i class="iconfont icon-search"></i>
+            </a>
+          </li>
+          
+        
+        
+          <li class="nav-item" id="color-toggle-btn">
+            <a class="nav-link" target="_self" href="javascript:;" aria-label="Color Toggle">
+              <i class="iconfont icon-dark" id="color-toggle-icon"></i>
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+  
+
+<div id="banner" class="banner" parallax=true
+     style="background: url('/img/default.png') no-repeat center center; background-size: cover;">
+  <div class="full-bg-img">
+    <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
+      <div class="banner-text text-center fade-in-up">
+        <div class="h2">
+          
+            <span id="subtitle" data-typed-text="list-watch在网络中断后的恢复机制"></span>
+          
+        </div>
+
+        
+          
+  <div class="mt-3">
+    
+    
+      <span class="post-meta">
+        <i class="iconfont icon-date-fill" aria-hidden="true"></i>
+        <time datetime="2025-07-25 19:51" pubdate>
+          2025年7月25日 晚上
+        </time>
+      </span>
+    
+  </div>
+
+  <div class="mt-1">
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-chart"></i>
+        
+          741 字
+        
+      </span>
+    
+
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-clock-fill"></i>
+        
+        
+        
+          7 分钟
+        
+      </span>
+    
+
+    
+    
+  </div>
+
+
+        
+      </div>
+
+      
+    </div>
+  </div>
+</div>
+
+</div>
+
+  </header>
+
+  <main>
+    
+      
+
+<div class="container-fluid nopadding-x">
+  <div class="row nomargin-x">
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+
+    </div>
+
+    <div class="col-lg-8 nopadding-x-md">
+      <div class="container nopadding-x-md" id="board-ctn">
+        <div id="board">
+          <article class="post-content mx-auto">
+            <h1 id="seo-header">list-watch在网络中断后的恢复机制</h1>
+            
+            
+              <div class="markdown-body">
+                
+                <h1 id="list-watch在网络中断后的恢复机制"><a href="#list-watch在网络中断后的恢复机制" class="headerlink" title="list-watch在网络中断后的恢复机制"></a>list-watch在网络中断后的恢复机制</h1><p>在 Kubernetes 中，<code>List-Watch</code> 机制是客户端（如 kube-apiserver 的客户端）监听资源变化的核心机制。当网络中断后重新连接时，<code>List-Watch</code> 会通过以下方式恢复状态，确保不丢失事件并保持数据一致性：</p>
+<hr>
+<h3 id="1-初始阶段：全量-List"><a href="#1-初始阶段：全量-List" class="headerlink" title="1. 初始阶段：全量 List"></a>1. <strong>初始阶段：全量 List</strong></h3><ul>
+<li>客户端首次启动或需要全量同步时，会先调用 <code>List</code> 获取资源的当前全量状态（所有对象的最新版本），并缓存在本地。</li>
+<li>此时会记录资源的 <code>ResourceVersion</code>（一个全局递增的版本号，表示 etcd 中资源的当前版本）。</li>
+</ul>
+<hr>
+<h3 id="2-监听阶段：增量-Watch"><a href="#2-监听阶段：增量-Watch" class="headerlink" title="2. 监听阶段：增量 Watch"></a>2. <strong>监听阶段：增量 Watch</strong></h3><ul>
+<li>客户端基于 <code>List</code> 返回的 <code>ResourceVersion</code> 发起 <code>Watch</code> 请求，监听该资源从此版本之后的所有变更（<code>ADDED</code>&#x2F;<code>MODIFIED</code>&#x2F;<code>DELETED</code> 事件）。</li>
+<li><code>Watch</code> 是一个长连接，apiserver 会持续推送事件。</li>
+</ul>
+<hr>
+<h3 id="3-网络中断后的恢复机制"><a href="#3-网络中断后的恢复机制" class="headerlink" title="3. 网络中断后的恢复机制"></a>3. <strong>网络中断后的恢复机制</strong></h3><p>当网络中断导致 <code>Watch</code> 连接断开时，客户端会按以下步骤恢复：</p>
+<h4 id="（1）自动重连"><a href="#（1）自动重连" class="headerlink" title="（1）自动重连"></a>（1）<strong>自动重连</strong></h4><ul>
+<li>客户端库（如 client-go）会自动尝试重新建立与 apiserver 的连接。</li>
+</ul>
+<h4 id="（2）基于最新-ResourceVersion-重新-Watch"><a href="#（2）基于最新-ResourceVersion-重新-Watch" class="headerlink" title="（2）基于最新 ResourceVersion 重新 Watch"></a>（2）<strong>基于最新 ResourceVersion 重新 Watch</strong></h4><ul>
+<li>客户端会使用**最后一次收到的事件的 <code>ResourceVersion</code>**（本地缓存中最新的版本号）发起新的 <code>Watch</code> 请求。<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><code class="hljs go">watchOpts := metav1.ListOptions&#123;<br>    ResourceVersion: lastObservedRV, <span class="hljs-comment">// 上次记录的版本号</span><br>&#125;<br>watcher, err := client.Watch(ctx, watchOpts)<br></code></pre></td></tr></table></figure></li>
+<li>这样 apiserver 会返回从该 <code>ResourceVersion</code> 之后的所有变更事件，确保不丢失任何事件。</li>
+</ul>
+<h4 id="（3）处理历史事件压缩（Compact）"><a href="#（3）处理历史事件压缩（Compact）" class="headerlink" title="（3）处理历史事件压缩（Compact）"></a>（3）<strong>处理历史事件压缩（Compact）</strong></h4><ul>
+<li>如果网络中断时间过长，apiserver 可能已清理（compact）过老的 <code>ResourceVersion</code>（etcd 的默认历史窗口为 5 分钟）。</li>
+<li>此时重新 <code>Watch</code> 会返回 <code>410 Gone</code> 错误，表示请求的 <code>ResourceVersion</code> 已不可用。</li>
+<li>客户端需要<strong>重新全量 <code>List</code></strong> 并更新本地缓存，然后基于新的 <code>ResourceVersion</code> 启动 <code>Watch</code>。</li>
+</ul>
+<h4 id="（4）幂等处理"><a href="#（4）幂等处理" class="headerlink" title="（4）幂等处理"></a>（4）<strong>幂等处理</strong></h4><ul>
+<li>客户端需要处理重复事件（如因重连导致的事件重复推送），通常通过比较 <code>ResourceVersion</code> 去重。</li>
+</ul>
+<hr>
+<h3 id="4-关键设计保障"><a href="#4-关键设计保障" class="headerlink" title="4. 关键设计保障"></a>4. <strong>关键设计保障</strong></h3><ul>
+<li><strong>ResourceVersion 的全局有序性</strong>：所有资源的变更均按 <code>ResourceVersion</code> 严格排序，确保客户端可以精确断点续传。</li>
+<li><strong>事件持久化</strong>：apiserver 从 etcd 读取事件并缓存，即使客户端断开连接，事件也不会丢失。</li>
+<li><strong>错误处理标准化</strong>：通过 <code>410 Gone</code> 明确通知客户端需要全量同步。</li>
+</ul>
+<hr>
+<h3 id="5-客户端实现（以-client-go-为例"><a href="#5-客户端实现（以-client-go-为例" class="headerlink" title="5. 客户端实现（以 client-go 为例"></a>5. <strong>客户端实现（以 client-go 为例</strong></h3><ul>
+<li><strong>Informer 机制</strong> 封装了 <code>List-Watch</code> 的容错逻辑：<ol>
+<li>首次启动时全量 <code>List</code>。</li>
+<li><code>Watch</code> 断开后自动用最新 <code>ResourceVersion</code> 重连。</li>
+<li>收到 <code>410</code> 错误时触发 <code>List</code> 全量同步。</li>
+<li>通过 <code>Delta FIFO</code> 队列处理事件，确保顺序和去重。</li>
+</ol>
+</li>
+</ul>
+<hr>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>网络中断恢复的核心是通过 <code>ResourceVersion</code> 实现的断点续传：  </p>
+<ol>
+<li>短期中断：基于缓存的 <code>ResourceVersion</code> 重新 <code>Watch</code>，获取中断期间的事件。  </li>
+<li>长期中断：触发全量 <code>List</code> 后重新 <code>Watch</code>。<br>这种机制保证了最终一致性和可靠性，是 Kubernetes 声明式 API 的基础。</li>
+</ol>
+
+                
+              </div>
+            
+            <hr/>
+            <div>
+              <div class="post-metas my-3">
+  
+  
+</div>
+
+
+              
+  
+
+  <div class="license-box my-3">
+    <div class="license-title">
+      <div>list-watch在网络中断后的恢复机制</div>
+      <div>http://guy-18.github.io/2025/07/25/list-watch在网络中断后的恢复机制/</div>
+    </div>
+    <div class="license-meta">
+      
+        <div class="license-meta-item">
+          <div>作者</div>
+          <div>John</div>
+        </div>
+      
+      
+        <div class="license-meta-item license-meta-date">
+          <div>发布于</div>
+          <div>2025年7月25日</div>
+        </div>
+      
+      
+      
+        <div class="license-meta-item">
+          <div>许可协议</div>
+          <div>
+            
+              
+              
+                <a class="print-no-link" target="_blank" href="https://creativecommons.org/licenses/by/4.0/">
+                  <span class="hint--top hint--rounded" aria-label="BY - 署名">
+                    <i class="iconfont icon-cc-by"></i>
+                  </span>
+                </a>
+              
+            
+          </div>
+        </div>
+      
+    </div>
+    <div class="license-icon iconfont"></div>
+  </div>
+
+
+
+              
+                <div class="post-prevnext my-3">
+                  <article class="post-prev col-6">
+                    
+                    
+                  </article>
+                  <article class="post-next col-6">
+                    
+                    
+                      <a href="/2025/07/25/Go%E7%AE%97%E6%B3%95%E9%A2%98-%E5%85%A8/" title="Go算法题-全">
+                        <span class="hidden-mobile">Go算法题-全</span>
+                        <span class="visible-mobile">下一篇</span>
+                        <i class="iconfont icon-arrowright"></i>
+                      </a>
+                    
+                  </article>
+                </div>
+              
+            </div>
+
+            
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+  <aside class="sidebar" style="margin-left: -1rem">
+    <div id="toc">
+  <p class="toc-header">
+    <i class="iconfont icon-list"></i>
+    <span>目录</span>
+  </p>
+  <div class="toc-body" id="toc-body"></div>
+</div>
+
+
+
+  </aside>
+
+
+    </div>
+  </div>
+</div>
+
+
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+
+
+
+
+    
+
+    
+      <a id="scroll-top-button" aria-label="TOP" href="#" role="button">
+        <i class="iconfont icon-arrowup" aria-hidden="true"></i>
+      </a>
+    
+
+    
+      <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header text-center">
+        <h4 class="modal-title w-100 font-weight-bold">搜索</h4>
+        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body mx-3">
+        <div class="md-form mb-5">
+          <input type="text" id="local-search-input" class="form-control validate">
+          <label data-error="x" data-success="v" for="local-search-input">关键词</label>
+        </div>
+        <div class="list-group" id="local-search-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+    
+
+    
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+  
+    <div class="footer-content">
+       <a href="https://hexo.io" target="_blank" rel="nofollow noopener"><span>Hexo</span></a> <i class="iconfont icon-love"></i> <a href="https://github.com/fluid-dev/hexo-theme-fluid" target="_blank" rel="nofollow noopener"><span>Fluid</span></a> 
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+
+  <!-- Scripts -->
+  
+  <script  src="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.js" ></script>
+  <link  rel="stylesheet" href="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.css" />
+
+  <script>
+    NProgress.configure({"showSpinner":false,"trickleSpeed":100})
+    NProgress.start()
+    window.addEventListener('load', function() {
+      NProgress.done();
+    })
+  </script>
+
+
+<script  src="https://lib.baomitu.com/jquery/3.6.4/jquery.min.js" ></script>
+<script  src="https://lib.baomitu.com/twitter-bootstrap/4.6.1/js/bootstrap.min.js" ></script>
+<script  src="/js/events.js" ></script>
+<script  src="/js/plugins.js" ></script>
+
+
+  <script  src="https://lib.baomitu.com/typed.js/2.0.12/typed.min.js" ></script>
+  <script>
+    (function (window, document) {
+      var typing = Fluid.plugins.typing;
+      var subtitle = document.getElementById('subtitle');
+      if (!subtitle || !typing) {
+        return;
+      }
+      var text = subtitle.getAttribute('data-typed-text');
+      
+        typing(text);
+      
+    })(window, document);
+  </script>
+
+
+
+
+  
+    <script  src="/js/img-lazyload.js" ></script>
+  
+
+
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/tocbot/4.20.1/tocbot.min.js', function() {
+    var toc = jQuery('#toc');
+    if (toc.length === 0 || !window.tocbot) { return; }
+    var boardCtn = jQuery('#board-ctn');
+    var boardTop = boardCtn.offset().top;
+
+    window.tocbot.init(Object.assign({
+      tocSelector     : '#toc-body',
+      contentSelector : '.markdown-body',
+      linkClass       : 'tocbot-link',
+      activeLinkClass : 'tocbot-active-link',
+      listClass       : 'tocbot-list',
+      isCollapsedClass: 'tocbot-is-collapsed',
+      collapsibleClass: 'tocbot-is-collapsible',
+      scrollSmooth    : true,
+      includeTitleTags: true,
+      headingsOffset  : -boardTop,
+    }, CONFIG.toc));
+    if (toc.find('.toc-list-item').length > 0) {
+      toc.css('visibility', 'visible');
+    }
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('tocbot' in window) {
+        tocbot.refresh();
+        var toc = jQuery('#toc');
+        if (toc.length === 0 || !tocbot) {
+          return;
+        }
+        if (toc.find('.toc-list-item').length > 0) {
+          toc.css('visibility', 'visible');
+        }
+      }
+    });
+  });
+</script>
+
+
+  <script src=https://lib.baomitu.com/clipboard.js/2.0.11/clipboard.min.js></script>
+
+  <script>Fluid.plugins.codeWidget();</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/anchor-js/5.0.0/anchor.min.js', function() {
+    window.anchors.options = {
+      placement: CONFIG.anchorjs.placement,
+      visible  : CONFIG.anchorjs.visible
+    };
+    if (CONFIG.anchorjs.icon) {
+      window.anchors.options.icon = CONFIG.anchorjs.icon;
+    }
+    var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+    var res = [];
+    for (var item of el) {
+      res.push('.markdown-body > ' + item.trim());
+    }
+    if (CONFIG.anchorjs.placement === 'left') {
+      window.anchors.options.class = 'anchorjs-link-left';
+    }
+    window.anchors.add(res.join(', '));
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('anchors' in window) {
+        anchors.removeAll();
+        var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+        var res = [];
+        for (var item of el) {
+          res.push('.markdown-body > ' + item.trim());
+        }
+        if (CONFIG.anchorjs.placement === 'left') {
+          anchors.options.class = 'anchorjs-link-left';
+        }
+        anchors.add(res.join(', '));
+      }
+    });
+  });
+</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.js', function() {
+    Fluid.plugins.fancyBox();
+  });
+</script>
+
+
+  <script>Fluid.plugins.imageCaption();</script>
+
+  <script  src="/js/local-search.js" ></script>
+
+
+
+
+
+<!-- 主题的启动项，将它保持在最底部 -->
+<!-- the boot of the theme, keep it at the bottom -->
+<script  src="/js/boot.js" ></script>
+
+
+  
+
+  <noscript>
+    <div class="noscript-warning">博客在允许 JavaScript 运行的环境下浏览效果更佳</div>
+  </noscript>
+</body>
+</html>
