@@ -26,10 +26,12 @@
 <meta property="og:site_name" content="John的博客">
 <meta property="og:description" content="Volcano 调度器 Enqueue Action 源码级详解Enqueue Action 是 Volcano 调度工作流中的第一个关键步骤，负责将符合条件的待调度作业(Job)加入调度队列（标记为 Inqueue 状态）。以下结合源码（v1.8.0）详细解析其实现机制： 一、Enqueue Action 入口函数源码位置：pkg&#x2F;scheduler&#x2F;actions&#x2F;enqueue&#x2F;enqueu">
 <meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://guy-18.github.io/2025/08/09/volcano%E8%B0%83%E5%BA%A6%E5%99%A8Enqueue-Action%E8%AF%A6%E8%A7%A3/deepseek_mermaid_20250808_cd2327.svg">
 <meta property="article:published_time" content="2025-08-08T17:17:23.000Z">
-<meta property="article:modified_time" content="2025-08-08T17:18:00.222Z">
+<meta property="article:modified_time" content="2025-08-08T17:30:16.427Z">
 <meta property="article:author" content="John">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="http://guy-18.github.io/2025/08/09/volcano%E8%B0%83%E5%BA%A6%E5%99%A8Enqueue-Action%E8%AF%A6%E8%A7%A3/deepseek_mermaid_20250808_cd2327.svg">
   
   
   
@@ -222,7 +224,7 @@
       <span class="post-meta mr-2">
         <i class="iconfont icon-chart"></i>
         
-          1.4k 字
+          2.7k 字
         
       </span>
     
@@ -233,7 +235,7 @@
         
         
         
-          12 分钟
+          23 分钟
         
       </span>
     
@@ -347,7 +349,80 @@
 <td>gang 插件</td>
 </tr>
 </tbody></table>
-<h2 id="五、Enqueue-流程时序图"><a href="#五、Enqueue-流程时序图" class="headerlink" title="五、Enqueue 流程时序图"></a>五、Enqueue 流程时序图</h2><pre><code class=" mermaid">sequenceDiagram
+<h2 id="五、Enqueue-流程时序图"><a href="#五、Enqueue-流程时序图" class="headerlink" title="五、Enqueue 流程时序图"></a>五、Enqueue 流程时序图</h2><h1 id="Volcano-调度器-Enqueue-Action-源码级详解-1"><a href="#Volcano-调度器-Enqueue-Action-源码级详解-1" class="headerlink" title="Volcano 调度器 Enqueue Action 源码级详解"></a>Volcano 调度器 Enqueue Action 源码级详解</h1><p>Enqueue Action 是 Volcano 调度工作流中的第一个关键步骤，负责将符合条件的待调度作业(Job)加入调度队列（标记为 Inqueue 状态）。以下结合源码（v1.8.0）详细解析其实现机制：</p>
+<h2 id="一、Enqueue-Action-入口函数-1"><a href="#一、Enqueue-Action-入口函数-1" class="headerlink" title="一、Enqueue Action 入口函数"></a>一、Enqueue Action 入口函数</h2><p><strong>源码位置</strong>：<code>pkg/scheduler/actions/enqueue/enqueue.go</code></p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(enqueue *Action)</span></span> Execute(ssn *framework.Session) &#123;<br>    <span class="hljs-comment">// 1. 获取所有Pending状态的作业</span><br>    pendingJobs := jobsMap(ssn.Jobs, <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">(job *api.JobInfo)</span></span> <span class="hljs-type">bool</span> &#123;<br>        <span class="hljs-keyword">return</span> job.IsPending()<br>    &#125;)<br>    <br>    <span class="hljs-comment">// 2. 按队列分组并排序</span><br>    queueJobs := sortJobs(pendingJobs, ssn)<br>    <br>    <span class="hljs-comment">// 3. 遍历队列处理作业</span><br>    <span class="hljs-keyword">for</span> _, queue := <span class="hljs-keyword">range</span> ssn.Queues &#123;<br>        jobs, found := queueJobs[queue.UID]<br>        <span class="hljs-keyword">if</span> !found &#123; <span class="hljs-keyword">continue</span> &#125;<br>        <br>        <span class="hljs-comment">// 4. 按插件定义的顺序排序作业</span><br>        sort.Slice(jobs, <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">(i, j <span class="hljs-type">int</span>)</span></span> <span class="hljs-type">bool</span> &#123;<br>            <span class="hljs-keyword">return</span> ssn.JobOrderFn(jobs[i], jobs[j]) || <br>                  (!ssn.JobOrderFn(jobs[j], jobs[i]) &amp;&amp; jobs[i].UID &lt; jobs[j].UID)<br>        &#125;)<br>        <br>        <span class="hljs-comment">// 5. 处理队列中的每个作业</span><br>        <span class="hljs-keyword">for</span> _, job := <span class="hljs-keyword">range</span> jobs &#123;<br>            <span class="hljs-comment">// 6. 执行入队检查</span><br>            <span class="hljs-keyword">if</span> status := enqueue.jobEnqueueable(job, ssn); !status.IsSuccess() &#123;<br>                <span class="hljs-keyword">continue</span><br>            &#125;<br>            <br>            <span class="hljs-comment">// 7. 更新作业状态</span><br>            job.PodGroup.Status.Phase = scheduling.PodGroupInqueue<br>            ssn.Jobs[job.UID] = job<br>            <br>            <span class="hljs-comment">// 8. 更新队列状态</span><br>            ssn.UpdateQueueStatus(job.Queue, <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">(status *api.QueueStatus)</span></span> &#123;<br>                status.Pending -= <span class="hljs-number">1</span><br>                status.Inqueue += <span class="hljs-number">1</span><br>            &#125;)<br>        &#125;<br>    &#125;<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<h2 id="二、核心处理流程详解-1"><a href="#二、核心处理流程详解-1" class="headerlink" title="二、核心处理流程详解"></a>二、核心处理流程详解</h2><h3 id="1-作业筛选与分组-1"><a href="#1-作业筛选与分组-1" class="headerlink" title="1. 作业筛选与分组"></a>1. 作业筛选与分组</h3><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><code class="hljs go">pendingJobs := jobsMap(ssn.Jobs, <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">(job *api.JobInfo)</span></span> <span class="hljs-type">bool</span> &#123;<br>    <span class="hljs-keyword">return</span> job.IsPending()<br>&#125;)<br></code></pre></td></tr></table></figure>
+<ul>
+<li>从 Session 缓存中筛选所有状态为 <code>Pending</code> 的作业</li>
+<li><code>JobInfo</code> 结构体（<code>pkg/scheduler/api/job_info.go</code>）封装了作业的完整信息</li>
+</ul>
+<h3 id="2-队列排序机制-1"><a href="#2-队列排序机制-1" class="headerlink" title="2. 队列排序机制"></a>2. 队列排序机制</h3><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><code class="hljs go">queues := <span class="hljs-built_in">make</span>([]*api.QueueInfo, <span class="hljs-number">0</span>, <span class="hljs-built_in">len</span>(ssn.Queues))<br><span class="hljs-keyword">for</span> _, queue := <span class="hljs-keyword">range</span> ssn.Queues &#123;<br>    queues = <span class="hljs-built_in">append</span>(queues, queue)<br>&#125;<br>sort.Slice(queues, <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">(i, j <span class="hljs-type">int</span>)</span></span> <span class="hljs-type">bool</span> &#123;<br>    <span class="hljs-keyword">return</span> ssn.QueueOrderFn(queues[i], queues[j])<br>&#125;)<br></code></pre></td></tr></table></figure>
+<ul>
+<li>使用 <code>QueueOrderFn</code> 对队列排序（默认为 DRF 算法）</li>
+<li>自定义排序可通过 <code>proportion</code> 插件实现（<code>pkg/scheduler/plugins/proportion</code>）</li>
+</ul>
+<h3 id="3-作业入队检查-1"><a href="#3-作业入队检查-1" class="headerlink" title="3. 作业入队检查"></a>3. 作业入队检查</h3><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(enqueue *Action)</span></span> jobEnqueueable(job *api.JobInfo, ssn *framework.Session) *api.Status &#123;<br>    <span class="hljs-comment">// 调用所有注册的JobEnqueueable插件</span><br>    <span class="hljs-keyword">for</span> _, enqueueableFn := <span class="hljs-keyword">range</span> ssn.JobEnqueueableFns &#123;<br>        <span class="hljs-keyword">if</span> status := enqueueableFn(job); !status.IsSuccess() &#123;<br>            <span class="hljs-keyword">return</span> status<br>        &#125;<br>    &#125;<br>    <span class="hljs-keyword">return</span> api.NewStatus(api.Success)<br>&#125;<br></code></pre></td></tr></table></figure>
+<ul>
+<li>通过插件链实现多条件检查</li>
+<li>关键检查插件：<ul>
+<li><strong>Gang 插件</strong>：检查 minAvailable 资源是否满足</li>
+<li><strong>ResourceQuota 插件</strong>：检查队列配额</li>
+<li><strong>SLA 插件</strong>：检查作业等待时间</li>
+</ul>
+</li>
+</ul>
+<h3 id="4-Gang-插件资源检查-1"><a href="#4-Gang-插件资源检查-1" class="headerlink" title="4. Gang 插件资源检查"></a>4. Gang 插件资源检查</h3><p><strong>源码位置</strong>：<code>pkg/scheduler/plugins/gang/gang.go</code></p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(gp *Plugin)</span></span> JobEnqueueable(job *api.JobInfo) *api.Status &#123;<br>    <span class="hljs-comment">// 1. 检查minAvailable设置</span><br>    <span class="hljs-keyword">if</span> job.MinAvailable &gt; <span class="hljs-type">uint32</span>(<span class="hljs-built_in">len</span>(job.Tasks)) &#123;<br>        <span class="hljs-keyword">return</span> api.NewStatus(api.Error, <span class="hljs-string">&quot;minAvailable &gt; task count&quot;</span>)<br>    &#125;<br>    <br>    <span class="hljs-comment">// 2. 计算集群总资源</span><br>    total := gp.totalResources(job)<br>    <br>    <span class="hljs-comment">// 3. 检查作业资源需求</span><br>    <span class="hljs-keyword">if</span> job.PodGroup.Spec.MinResources != <span class="hljs-literal">nil</span> &#123;<br>        minReq := job.PodGroup.Spec.MinResources<br>        <span class="hljs-keyword">if</span> !api.Less(minReq, total) &#123;<br>            <span class="hljs-keyword">return</span> api.NewStatus(api.Unschedulable, <br>                <span class="hljs-string">&quot;not enough resources: requested %v &gt; cluster total %v&quot;</span>, <br>                minReq, total)<br>        &#125;<br>    &#125;<br>    <span class="hljs-keyword">return</span> api.NewStatus(api.Success)<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<h3 id="5-ResourceQuota-插件队列配额检查-1"><a href="#5-ResourceQuota-插件队列配额检查-1" class="headerlink" title="5. ResourceQuota 插件队列配额检查"></a>5. ResourceQuota 插件队列配额检查</h3><p><strong>源码位置</strong>：<code>pkg/scheduler/plugins/proportion/proportion.go</code></p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(pp *Plugin)</span></span> JobEnqueueable(job *api.JobInfo) *api.Status &#123;<br>    queue := pp.ssn.Queue(job.Queue)<br>    <span class="hljs-keyword">if</span> queue == <span class="hljs-literal">nil</span> &#123;<br>        <span class="hljs-keyword">return</span> api.NewStatus(api.Error, <span class="hljs-string">&quot;queue not found&quot;</span>)<br>    &#125;<br>    <br>    <span class="hljs-comment">// 计算作业资源需求</span><br>    jobReq := api.EmptyResource()<br>    <span class="hljs-keyword">if</span> job.PodGroup.Spec.MinResources != <span class="hljs-literal">nil</span> &#123;<br>        jobReq.Add(job.PodGroup.Spec.MinResources)<br>    &#125;<br>    <br>    <span class="hljs-comment">// 检查队列剩余配额</span><br>    deserved := queue.Queue.Status.Deserved.Clone()<br>    used := queue.Queue.Status.Used.Clone()<br>    allocatable := deserved.Sub(used)<br>    <br>    <span class="hljs-keyword">if</span> allocatable.Less(jobReq) &#123;<br>        <span class="hljs-keyword">return</span> api.NewStatus(api.Unschedulable,<br>            <span class="hljs-string">&quot;insufficient queue quota: requested %v, available %v&quot;</span>,<br>            jobReq, allocatable)<br>    &#125;<br>    <span class="hljs-keyword">return</span> api.NewStatus(api.Success)<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<h3 id="6-SLA-插件超时处理-1"><a href="#6-SLA-插件超时处理-1" class="headerlink" title="6. SLA 插件超时处理"></a>6. SLA 插件超时处理</h3><p><strong>源码位置</strong>：<code>pkg/scheduler/plugins/sla/sla.go</code></p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(s *slaPlugin)</span></span> JobEnqueueable(job *api.JobInfo) *api.Status &#123;<br>    <span class="hljs-comment">// 1. 获取SLA配置</span><br>    timeout, err := s.getSLATimeout(job)<br>    <span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<br>        <span class="hljs-keyword">return</span> api.NewStatus(api.Error, err.Error())<br>    &#125;<br>    <br>    <span class="hljs-comment">// 2. 检查是否超时</span><br>    now := time.Now()<br>    waitTime := now.Sub(job.PodGroup.CreationTimestamp.Time)<br>    <br>    <span class="hljs-keyword">if</span> waitTime &gt;= timeout &#123;<br>        <span class="hljs-comment">// 3. 超时作业强制入队</span><br>        <span class="hljs-keyword">return</span> api.NewStatus(api.Success, <span class="hljs-string">&quot;SLA timeout enforced&quot;</span>)<br>    &#125;<br>    <br>    <span class="hljs-comment">// 4. 未超时作业正常检查</span><br>    <span class="hljs-keyword">return</span> api.NewStatus(api.Unschedulable, <br>        <span class="hljs-string">&quot;within SLA period: waited %v &lt; timeout %v&quot;</span>, waitTime, timeout)<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<h2 id="三、状态更新机制-1"><a href="#三、状态更新机制-1" class="headerlink" title="三、状态更新机制"></a>三、状态更新机制</h2><h3 id="1-作业状态更新-1"><a href="#1-作业状态更新-1" class="headerlink" title="1. 作业状态更新"></a>1. 作业状态更新</h3><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs go">job.PodGroup.Status.Phase = scheduling.PodGroupInqueue<br></code></pre></td></tr></table></figure>
+<ul>
+<li>将 PodGroup 状态从 <code>Pending</code> 更新为 <code>Inqueue</code></li>
+<li>更新后的状态会同步到 Kubernetes API Server</li>
+</ul>
+<h3 id="2-队列状态更新-1"><a href="#2-队列状态更新-1" class="headerlink" title="2. 队列状态更新"></a>2. 队列状态更新</h3><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><code class="hljs go">ssn.UpdateQueueStatus(job.Queue, <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">(status *api.QueueStatus)</span></span> &#123;<br>    status.Pending -= <span class="hljs-number">1</span><br>    status.Inqueue += <span class="hljs-number">1</span><br>&#125;)<br></code></pre></td></tr></table></figure>
+<ul>
+<li>更新队列的作业计数</li>
+<li>资源配额更新由 proportion 插件在后续处理</li>
+</ul>
+<h2 id="四、Enqueue-Action-的插件扩展点-1"><a href="#四、Enqueue-Action-的插件扩展点-1" class="headerlink" title="四、Enqueue Action 的插件扩展点"></a>四、Enqueue Action 的插件扩展点</h2><table>
+<thead>
+<tr>
+<th>扩展点</th>
+<th>作用</th>
+<th>默认实现</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>QueueOrderFn</code></td>
+<td>定义队列排序逻辑</td>
+<td>proportion 插件</td>
+</tr>
+<tr>
+<td><code>JobOrderFn</code></td>
+<td>定义作业在队列内的排序逻辑</td>
+<td>FIFO</td>
+</tr>
+<tr>
+<td><code>JobEnqueueableFn</code></td>
+<td>定义作业入队条件检查</td>
+<td>gang&#x2F;resoucequota</td>
+</tr>
+<tr>
+<td><code>JobReadyFn</code></td>
+<td>定义作业是否准备好调度</td>
+<td>gang 插件</td>
+</tr>
+</tbody></table>
+<h2 id="五、Enqueue-流程时序图-1"><a href="#五、Enqueue-流程时序图-1" class="headerlink" title="五、Enqueue 流程时序图"></a>五、Enqueue 流程时序图</h2><p><img src="/2025/08/09/volcano%E8%B0%83%E5%BA%A6%E5%99%A8Enqueue-Action%E8%AF%A6%E8%A7%A3/deepseek_mermaid_20250808_cd2327.svg" srcset="/img/loading.gif" lazyload alt="deepseek_mermaid_20250808_cd2327"></p>
+<pre><code class=" mermaid">sequenceDiagram
     participant Scheduler
     proportion-&gt;&gt;Scheduler: 提供QueueOrderFn
     gang-&gt;&gt;Scheduler: 提供JobEnqueueableFn
@@ -377,6 +452,68 @@
 </code></pre>
 
 <h2 id="六、设计要点分析"><a href="#六、设计要点分析" class="headerlink" title="六、设计要点分析"></a>六、设计要点分析</h2><ol>
+<li><p><strong>插件化架构</strong>：</p>
+<ul>
+<li>所有核心逻辑通过插件接口实现</li>
+<li>支持自定义扩展而不修改核心代码</li>
+</ul>
+</li>
+<li><p><strong>两级排序机制</strong>：</p>
+<ul>
+<li>队列级排序：决定哪个队列优先调度</li>
+<li>作业级排序：决定队列内作业的调度顺序</li>
+</ul>
+</li>
+<li><p><strong>条件检查链</strong>：</p>
+<ul>
+<li>多个检查插件形成”与”逻辑关系</li>
+<li>任一插件拒绝则作业不入队</li>
+</ul>
+</li>
+<li><p><strong>状态原子更新</strong>：</p>
+<ul>
+<li>作业状态更新与队列计数更新同步进行</li>
+<li>通过 Session 保证操作原子性</li>
+</ul>
+</li>
+<li><p><strong>资源预留设计</strong>：</p>
+<ul>
+<li>入队时不立即占用资源</li>
+<li>实际资源分配在 Allocate Action 进行</li>
+</ul>
+</li>
+</ol>
+<p>Enqueue Action 通过这种设计实现了高效的作业准入控制，为后续的资源分配阶段提供了合格的候选作业集合，同时保证了集群资源的合理利用和作业的公平调度。</p>
+<pre><code class=" mermaid">sequenceDiagram
+    participant Scheduler
+    proportion-&gt;&gt;Scheduler: 提供QueueOrderFn
+    gang-&gt;&gt;Scheduler: 提供JobEnqueueableFn
+    sla-&gt;&gt;Scheduler: 提供JobEnqueueableFn
+    
+    Scheduler-&gt;&gt;Cache: 获取Pending作业
+    Cache--&gt;&gt;Scheduler: 返回Job列表
+    
+    loop 每个队列
+        Scheduler-&gt;&gt;proportion: 调用QueueOrderFn排序队列
+        proportion--&gt;&gt;Scheduler: 返回队列排序结果
+        
+        loop 队列内作业
+            Scheduler-&gt;&gt;gang: 调用JobEnqueueableFn
+            gang--&gt;&gt;Scheduler: 返回资源检查结果
+            Scheduler-&gt;&gt;sla: 调用JobEnqueueableFn
+            sla--&gt;&gt;Scheduler: 返回超时检查结果
+            
+            alt 检查通过
+                Scheduler-&gt;&gt;API Server: 更新PodGroup状态(Inqueue)
+                Scheduler-&gt;&gt;Cache: 更新队列状态
+            else 检查失败
+                Scheduler-&gt;&gt;Log: 记录拒绝原因
+            end
+        end
+    end
+</code></pre>
+
+<h2 id="六、设计要点分析-1"><a href="#六、设计要点分析-1" class="headerlink" title="六、设计要点分析"></a>六、设计要点分析</h2><ol>
 <li><p><strong>插件化架构</strong>：</p>
 <ul>
 <li>所有核心逻辑通过插件接口实现</li>
