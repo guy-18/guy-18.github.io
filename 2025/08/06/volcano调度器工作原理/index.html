@@ -1,0 +1,918 @@
+
+
+<!DOCTYPE html>
+<html lang="zh-CN" data-default-color-scheme=auto>
+
+
+
+<head>
+  <meta charset="UTF-8">
+
+  <link rel="apple-touch-icon" sizes="76x76" href="/img/fluid.png">
+  <link rel="icon" href="/img/fluid.png">
+  
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, shrink-to-fit=no">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  
+  <meta name="theme-color" content="#2f4154">
+  <meta name="author" content="John">
+  <meta name="keywords" content="">
+  
+    <meta name="description" content="Volcano 调度器核心概念与工作原理详解一、核心概念全景图1. 调度会话 (Session) 定义：调度器每次决策的完整周期 生命周期：graph LR   A[会话开始] --&gt; B[获取集群快照]   B --&gt; C[执行调度逻辑]   C --&gt; D[提交调度决策]   D --&gt; E[会话结束]  关键数据：包含集群状态（节点、作业、队列）的完整内存模型  2.">
+<meta property="og:type" content="article">
+<meta property="og:title" content="volcano调度器工作原理">
+<meta property="og:url" content="http://guy-18.github.io/2025/08/06/volcano%E8%B0%83%E5%BA%A6%E5%99%A8%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86/index.html">
+<meta property="og:site_name" content="John的博客">
+<meta property="og:description" content="Volcano 调度器核心概念与工作原理详解一、核心概念全景图1. 调度会话 (Session) 定义：调度器每次决策的完整周期 生命周期：graph LR   A[会话开始] --&gt; B[获取集群快照]   B --&gt; C[执行调度逻辑]   C --&gt; D[提交调度决策]   D --&gt; E[会话结束]  关键数据：包含集群状态（节点、作业、队列）的完整内存模型  2.">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2025-08-06T10:03:34.000Z">
+<meta property="article:modified_time" content="2025-08-06T10:07:34.136Z">
+<meta property="article:author" content="John">
+<meta name="twitter:card" content="summary_large_image">
+  
+  
+  
+  <title>volcano调度器工作原理 - John的博客</title>
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/twitter-bootstrap/4.6.1/css/bootstrap.min.css" />
+
+
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/github-markdown-css/4.0.0/github-markdown.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/hint.css/2.7.0/hint.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.css" />
+
+
+
+<!-- 主题依赖的图标库，不要自行修改 -->
+<!-- Do not modify the link that theme dependent icons -->
+
+<link rel="stylesheet" href="//at.alicdn.com/t/c/font_1749284_5i9bdhy70f8.css">
+
+
+
+<link rel="stylesheet" href="//at.alicdn.com/t/c/font_1736178_k526ubmyhba.css">
+
+
+<link  rel="stylesheet" href="/css/main.css" />
+
+
+  <link id="highlight-css" rel="stylesheet" href="/css/highlight.css" />
+  
+    <link id="highlight-css-dark" rel="stylesheet" href="/css/highlight-dark.css" />
+  
+
+
+
+
+  <script id="fluid-configs">
+    var Fluid = window.Fluid || {};
+    Fluid.ctx = Object.assign({}, Fluid.ctx)
+    var CONFIG = {"hostname":"guy-18.github.io","root":"/","version":"1.9.8","typing":{"enable":true,"typeSpeed":70,"cursorChar":"_","loop":false,"scope":[]},"anchorjs":{"enable":true,"element":"h1,h2,h3,h4,h5,h6","placement":"left","visible":"hover","icon":""},"progressbar":{"enable":true,"height_px":3,"color":"#29d","options":{"showSpinner":false,"trickleSpeed":100}},"code_language":{"enable":true,"default":"TEXT"},"copy_btn":true,"image_caption":{"enable":true},"image_zoom":{"enable":true,"img_url_replace":["",""]},"toc":{"enable":true,"placement":"right","headingSelector":"h1,h2,h3,h4,h5,h6","collapseDepth":0},"lazyload":{"enable":true,"loading_img":"/img/loading.gif","onlypost":false,"offset_factor":2},"web_analytics":{"enable":false,"follow_dnt":true,"baidu":null,"google":{"measurement_id":null},"tencent":{"sid":null,"cid":null},"leancloud":{"app_id":null,"app_key":null,"server_url":null,"path":"window.location.pathname","ignore_local":false},"umami":{"src":null,"website_id":null,"domains":null,"start_time":"2024-01-01T00:00:00.000Z","token":null,"api_server":null}},"search_path":"/local-search.xml","include_content_in_search":true};
+
+    if (CONFIG.web_analytics.follow_dnt) {
+      var dntVal = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+      Fluid.ctx.dnt = dntVal && (dntVal.startsWith('1') || dntVal.startsWith('yes') || dntVal.startsWith('on'));
+    }
+  </script>
+  <script  src="/js/utils.js" ></script>
+  <script  src="/js/color-schema.js" ></script>
+  
+
+
+  
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+
+<body>
+  
+
+  <header>
+    
+
+<div class="header-inner" style="height: 70vh;">
+  <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
+  <div class="container">
+    <a class="navbar-brand" href="/">
+      <strong>Fluid</strong>
+    </a>
+
+    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
+            data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <div class="animated-icon"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Collapsible content -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ml-auto text-center">
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/" target="_self">
+                <i class="iconfont icon-home-fill"></i>
+                <span>首页</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/archives/" target="_self">
+                <i class="iconfont icon-archive-fill"></i>
+                <span>归档</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/categories/" target="_self">
+                <i class="iconfont icon-category-fill"></i>
+                <span>分类</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/tags/" target="_self">
+                <i class="iconfont icon-tags-fill"></i>
+                <span>标签</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/about/" target="_self">
+                <i class="iconfont icon-user-fill"></i>
+                <span>关于</span>
+              </a>
+            </li>
+          
+        
+        
+          <li class="nav-item" id="search-btn">
+            <a class="nav-link" target="_self" href="javascript:;" data-toggle="modal" data-target="#modalSearch" aria-label="Search">
+              <i class="iconfont icon-search"></i>
+            </a>
+          </li>
+          
+        
+        
+          <li class="nav-item" id="color-toggle-btn">
+            <a class="nav-link" target="_self" href="javascript:;" aria-label="Color Toggle">
+              <i class="iconfont icon-dark" id="color-toggle-icon"></i>
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+  
+
+<div id="banner" class="banner" parallax=true
+     style="background: url('/img/default.png') no-repeat center center; background-size: cover;">
+  <div class="full-bg-img">
+    <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
+      <div class="banner-text text-center fade-in-up">
+        <div class="h2">
+          
+            <span id="subtitle" data-typed-text="volcano调度器工作原理"></span>
+          
+        </div>
+
+        
+          
+  <div class="mt-3">
+    
+    
+      <span class="post-meta">
+        <i class="iconfont icon-date-fill" aria-hidden="true"></i>
+        <time datetime="2025-08-06 18:03" pubdate>
+          2025年8月6日 晚上
+        </time>
+      </span>
+    
+  </div>
+
+  <div class="mt-1">
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-chart"></i>
+        
+          1.4k 字
+        
+      </span>
+    
+
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-clock-fill"></i>
+        
+        
+        
+          12 分钟
+        
+      </span>
+    
+
+    
+    
+  </div>
+
+
+        
+      </div>
+
+      
+    </div>
+  </div>
+</div>
+
+</div>
+
+  </header>
+
+  <main>
+    
+      
+
+<div class="container-fluid nopadding-x">
+  <div class="row nomargin-x">
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+
+    </div>
+
+    <div class="col-lg-8 nopadding-x-md">
+      <div class="container nopadding-x-md" id="board-ctn">
+        <div id="board">
+          <article class="post-content mx-auto">
+            <h1 id="seo-header">volcano调度器工作原理</h1>
+            
+            
+              <div class="markdown-body">
+                
+                <h1 id="Volcano-调度器核心概念与工作原理详解"><a href="#Volcano-调度器核心概念与工作原理详解" class="headerlink" title="Volcano 调度器核心概念与工作原理详解"></a>Volcano 调度器核心概念与工作原理详解</h1><h2 id="一、核心概念全景图"><a href="#一、核心概念全景图" class="headerlink" title="一、核心概念全景图"></a>一、核心概念全景图</h2><h3 id="1-调度会话-Session"><a href="#1-调度会话-Session" class="headerlink" title="1. 调度会话 (Session)"></a>1. 调度会话 (Session)</h3><ul>
+<li><strong>定义</strong>：调度器每次决策的完整周期</li>
+<li><strong>生命周期</strong>：<pre><code class=" mermaid">graph LR
+  A[会话开始] --&gt; B[获取集群快照]
+  B --&gt; C[执行调度逻辑]
+  C --&gt; D[提交调度决策]
+  D --&gt; E[会话结束]
+</code></pre></li>
+<li><strong>关键数据</strong>：包含集群状态（节点、作业、队列）的完整内存模型</li>
+</ul>
+<h3 id="2-调度单元-Scheduling-Units"><a href="#2-调度单元-Scheduling-Units" class="headerlink" title="2. 调度单元 (Scheduling Units)"></a>2. 调度单元 (Scheduling Units)</h3><table>
+<thead>
+<tr>
+<th>概念</th>
+<th>描述</th>
+<th>K8s 原生对应</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>PodGroup</strong></td>
+<td>原子调度单元（一组必须整体调度的Pod）</td>
+<td>无</td>
+</tr>
+<tr>
+<td><strong>VolcanoJob</strong></td>
+<td>增强型Job（支持多任务模板）</td>
+<td>Job</td>
+</tr>
+<tr>
+<td><strong>Queue</strong></td>
+<td>资源队列（多租户隔离）</td>
+<td>Namespace ResourceQuota</td>
+</tr>
+<tr>
+<td><strong>Task</strong></td>
+<td>作业内部的任务单元</td>
+<td>PodTemplate</td>
+</tr>
+</tbody></table>
+<h3 id="3-调度策略插件-Plugins"><a href="#3-调度策略插件-Plugins" class="headerlink" title="3. 调度策略插件 (Plugins)"></a>3. 调度策略插件 (Plugins)</h3><table>
+<thead>
+<tr>
+<th>插件名</th>
+<th>功能</th>
+<th>关键参数</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Gang</strong></td>
+<td>保证作业完整性</td>
+<td><code>minAvailable</code></td>
+</tr>
+<tr>
+<td><strong>DRF</strong></td>
+<td>多资源公平调度</td>
+<td><code>weight</code></td>
+</tr>
+<tr>
+<td><strong>Binpack</strong></td>
+<td>高密度装箱</td>
+<td><code>binpack.resources</code></td>
+</tr>
+<tr>
+<td><strong>Priority</strong></td>
+<td>作业优先级</td>
+<td><code>priorityClassName</code></td>
+</tr>
+<tr>
+<td><strong>Topology</strong></td>
+<td>拓扑感知调度</td>
+<td><code>topologyPolicy</code></td>
+</tr>
+<tr>
+<td><strong>Preempt</strong></td>
+<td>抢占机制</td>
+<td><code>preemptable</code></td>
+</tr>
+</tbody></table>
+<h3 id="4-调度动作-Actions"><a href="#4-调度动作-Actions" class="headerlink" title="4. 调度动作 (Actions)"></a>4. 调度动作 (Actions)</h3><table>
+<thead>
+<tr>
+<th>动作</th>
+<th>执行顺序</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Enqueue</strong></td>
+<td>1</td>
+<td>作业入队（检查队列配额）</td>
+</tr>
+<tr>
+<td><strong>Allocate</strong></td>
+<td>2</td>
+<td>核心资源分配</td>
+</tr>
+<tr>
+<td><strong>Backfill</strong></td>
+<td>3</td>
+<td>碎片资源填充</td>
+</tr>
+<tr>
+<td><strong>Preempt</strong></td>
+<td>4</td>
+<td>抢占低优先级作业</td>
+</tr>
+<tr>
+<td><strong>Reclaim</strong></td>
+<td>5</td>
+<td>回收超额资源</td>
+</tr>
+</tbody></table>
+<h2 id="二、调度器工作原理深度解析"><a href="#二、调度器工作原理深度解析" class="headerlink" title="二、调度器工作原理深度解析"></a>二、调度器工作原理深度解析</h2><h3 id="1-整体架构"><a href="#1-整体架构" class="headerlink" title="1. 整体架构"></a>1. 整体架构</h3><pre><code class=" mermaid">graph TD
+    A[API Server] --&gt;|Watch| B(Volcano Scheduler)
+    B --&gt;|决策| C[Kubelet]
+    D[Volcano Controllers] --&gt;|管理| E[VCJob/PodGroup/Queue]
+    F[Plugin Registry] --&gt;|扩展| B
+    G[Metrics Server] --&gt;|监控| B
+    
+    B --&gt;|插件链| H[Enqueue]
+    B --&gt;|插件链| I[Allocate]
+    B --&gt;|插件链| J[Backfill]
+</code></pre>
+
+<h3 id="2-调度循环完整流程"><a href="#2-调度循环完整流程" class="headerlink" title="2. 调度循环完整流程"></a>2. 调度循环完整流程</h3><h4 id="步骤1：会话初始化-Session-Initialization"><a href="#步骤1：会话初始化-Session-Initialization" class="headerlink" title="步骤1：会话初始化 (Session Initialization)"></a>步骤1：会话初始化 (Session Initialization)</h4><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-comment">// 创建新会话</span><br>session := NewSession(<br>    cache.GetNodes(),   <span class="hljs-comment">// 节点列表</span><br>    cache.GetJobs(),    <span class="hljs-comment">// 作业列表</span><br>    cache.GetQueues(),  <span class="hljs-comment">// 队列列表</span><br>)<br></code></pre></td></tr></table></figure>
+
+<h4 id="步骤2：插件链执行-Plugin-Chain-Execution"><a href="#步骤2：插件链执行-Plugin-Chain-Execution" class="headerlink" title="步骤2：插件链执行 (Plugin Chain Execution)"></a>步骤2：插件链执行 (Plugin Chain Execution)</h4><pre><code class=" mermaid">sequenceDiagram
+    Scheduler-&gt;&gt;+Enqueue: 执行入队
+    Enqueue--&gt;&gt;-Scheduler: 返回可调度作业
+    Scheduler-&gt;&gt;+Allocate: 分配资源
+    Allocate--&gt;&gt;-Scheduler: 返回分配方案
+    Scheduler-&gt;&gt;+Backfill: 填充碎片
+    Backfill--&gt;&gt;-Scheduler: 返回填充结果
+</code></pre>
+
+<h4 id="步骤3：核心调度算法-Allocate-Action"><a href="#步骤3：核心调度算法-Allocate-Action" class="headerlink" title="步骤3：核心调度算法 (Allocate Action)"></a>步骤3：核心调度算法 (Allocate Action)</h4><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><code class="hljs python"><span class="hljs-keyword">def</span> <span class="hljs-title function_">allocate</span>(<span class="hljs-params">session</span>):<br>    <span class="hljs-comment"># 1. 作业排序（优先级/提交时间）</span><br>    sorted_jobs = sort_jobs(session.jobs)<br>    <br>    <span class="hljs-keyword">for</span> job <span class="hljs-keyword">in</span> sorted_jobs:<br>        <span class="hljs-comment"># 2. 检查Gang条件</span><br>        <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> gang_plugin.check(job):<br>            <span class="hljs-keyword">continue</span>  <span class="hljs-comment"># 跳过不满足条件的作业</span><br>        <br>        <span class="hljs-comment"># 3. 任务排序（Chief优先）</span><br>        sorted_tasks = sort_tasks(job.tasks)<br>        <br>        <span class="hljs-keyword">for</span> task <span class="hljs-keyword">in</span> sorted_tasks:<br>            <span class="hljs-comment"># 4. 节点过滤（标签/污点）</span><br>            feasible_nodes = filter_nodes(task, session.nodes)<br>            <br>            <span class="hljs-comment"># 5. 节点评分（Binpack/Spread）</span><br>            scored_nodes = score_nodes(task, feasible_nodes)<br>            <br>            <span class="hljs-comment"># 6. 选择最优节点</span><br>            best_node = select_best_node(scored_nodes)<br>            <br>            <span class="hljs-comment"># 7. 临时绑定</span><br>            bind(task, best_node)<br>    <br>    <span class="hljs-comment"># 8. 提交绑定决策</span><br>    commit_bindings()<br></code></pre></td></tr></table></figure>
+
+<h4 id="步骤4：决策提交-Decision-Commit"><a href="#步骤4：决策提交-Decision-Commit" class="headerlink" title="步骤4：决策提交 (Decision Commit)"></a>步骤4：决策提交 (Decision Commit)</h4><ul>
+<li>原子性提交所有绑定操作</li>
+<li>状态更新：<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-keyword">if</span> all_bound &#123;<br>    podGroup.Status = Running<br>&#125; <span class="hljs-keyword">else</span> &#123;<br>    podGroup.Status = Pending<br>&#125;<br></code></pre></td></tr></table></figure></li>
+</ul>
+<h2 id="三、核心调度场景解析"><a href="#三、核心调度场景解析" class="headerlink" title="三、核心调度场景解析"></a>三、核心调度场景解析</h2><h3 id="1-Gang-Scheduling-实现"><a href="#1-Gang-Scheduling-实现" class="headerlink" title="1. Gang Scheduling 实现"></a>1. Gang Scheduling 实现</h3><p><strong>问题</strong>：如何保证分布式作业的所有Pod同时启动？</p>
+<p><strong>解决方案</strong>：</p>
+<pre><code class=" mermaid">sequenceDiagram
+    participant S as Scheduler
+    participant C as Cluster
+    S-&gt;&gt;C: 检查minAvailable资源
+    alt 资源充足
+        S-&gt;&gt;C: 预留所有资源
+        S-&gt;&gt;C: 原子绑定所有Pod
+        C--&gt;&gt;S: 绑定成功
+    else 资源不足
+        S-&gt;&gt;C: 不绑定任何Pod
+        C--&gt;&gt;S: 保持Pending状态
+    end
+</code></pre>
+
+<p><strong>关键代码</strong>：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(g *gangPlugin)</span></span> OnSessionOpen(ssn *framework.Session) &#123;<br>    ssn.AddJobReadyFn(<span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">(obj <span class="hljs-keyword">interface</span>&#123;&#125;)</span></span> <span class="hljs-type">bool</span> &#123;<br>        job := obj.(*api.JobInfo)<br>        ready := <span class="hljs-built_in">len</span>(job.ReadyTasks) &gt;= job.MinAvailable<br>        <span class="hljs-keyword">return</span> ready<br>    &#125;)<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<h3 id="2-抢占式调度-Preemption"><a href="#2-抢占式调度-Preemption" class="headerlink" title="2. 抢占式调度 (Preemption)"></a>2. 抢占式调度 (Preemption)</h3><p><strong>场景</strong>：高优先级作业需要资源时</p>
+<p><strong>工作流程</strong>：</p>
+<pre><code class=" mermaid">graph TD
+    A[新作业提交] --&gt; B&#123;资源不足&#125;
+    B --&gt;|是| C[选择牺牲者]
+    C --&gt; D[驱逐低优先级Pod]
+    D --&gt; E[释放资源]
+    E --&gt; F[调度新作业]
+</code></pre>
+
+<p><strong>牺牲者选择策略</strong>：</p>
+<ol>
+<li>最低优先级作业</li>
+<li>最小进度损失（可恢复作业优先）</li>
+<li>最少Pod数量</li>
+</ol>
+<h3 id="3-拓扑感知调度-Topology-Awareness"><a href="#3-拓扑感知调度-Topology-Awareness" class="headerlink" title="3. 拓扑感知调度 (Topology Awareness)"></a>3. 拓扑感知调度 (Topology Awareness)</h3><p><strong>GPU训练场景优化</strong>：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><code class="hljs yaml"><span class="hljs-attr">plugins:</span><br>  <span class="hljs-attr">topology:</span><br>    <span class="hljs-attr">enable:</span> <span class="hljs-literal">true</span><br>    <span class="hljs-attr">policies:</span><br>      <span class="hljs-bullet">-</span> <span class="hljs-attr">device:</span> <span class="hljs-string">GPU</span><br>        <span class="hljs-attr">gpuPolicy:</span> <span class="hljs-string">dgx-2</span> <span class="hljs-comment"># NVLink拓扑策略</span><br></code></pre></td></tr></table></figure>
+
+<p><strong>调度器行为</strong>：</p>
+<ol>
+<li>过滤具有NVLink的节点</li>
+<li>选择同一物理机上的GPU</li>
+<li>确保GPU通过高速互联</li>
+</ol>
+<h2 id="四、调度器高级特性"><a href="#四、调度器高级特性" class="headerlink" title="四、调度器高级特性"></a>四、调度器高级特性</h2><h3 id="1-批调度优化"><a href="#1-批调度优化" class="headerlink" title="1. 批调度优化"></a>1. 批调度优化</h3><table>
+<thead>
+<tr>
+<th>策略</th>
+<th>描述</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Binpack</strong></td>
+<td>紧密装箱减少碎片</td>
+<td>资源紧张环境</td>
+</tr>
+<tr>
+<td><strong>Spread</strong></td>
+<td>分散部署提高可用性</td>
+<td>高可用需求</td>
+</tr>
+<tr>
+<td><strong>DRF</strong></td>
+<td>多资源公平分配</td>
+<td>多租户环境</td>
+</tr>
+</tbody></table>
+<h3 id="2-弹性资源管理"><a href="#2-弹性资源管理" class="headerlink" title="2. 弹性资源管理"></a>2. 弹性资源管理</h3><pre><code class=" mermaid">graph LR
+    A[资源监控] --&gt; B&#123;资源不足&#125;
+    B --&gt;|是| C[驱逐离线作业]
+    B --&gt;|否| D[恢复离线作业]
+    D --&gt; E[从检查点继续]
+</code></pre>
+
+<h3 id="3-任务依赖-DAG"><a href="#3-任务依赖-DAG" class="headerlink" title="3. 任务依赖 (DAG)"></a>3. 任务依赖 (DAG)</h3><figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><code class="hljs yaml"><span class="hljs-attr">tasks:</span><br>  <span class="hljs-bullet">-</span> <span class="hljs-attr">name:</span> <span class="hljs-string">preprocess</span><br>    <span class="hljs-attr">replicas:</span> <span class="hljs-number">1</span><br>  <span class="hljs-bullet">-</span> <span class="hljs-attr">name:</span> <span class="hljs-string">training</span><br>    <span class="hljs-attr">replicas:</span> <span class="hljs-number">4</span><br>    <span class="hljs-attr">dependsOn:</span> [<span class="hljs-string">preprocess</span>] <span class="hljs-comment"># 依赖前置任务</span><br></code></pre></td></tr></table></figure>
+
+<h2 id="五、调度器内部状态机"><a href="#五、调度器内部状态机" class="headerlink" title="五、调度器内部状态机"></a>五、调度器内部状态机</h2><h3 id="PodGroup-状态流转"><a href="#PodGroup-状态流转" class="headerlink" title="PodGroup 状态流转"></a>PodGroup 状态流转</h3><pre><code class=" mermaid">stateDiagram-v2
+    [*] --&gt; Pending 创建
+    Pending --&gt; Running 资源满足
+    Running --&gt; Completed 所有任务成功
+    Running --&gt; Failed 任务失败
+    Pending --&gt; Failed 超时/配置错误
+    Failed --&gt; Pending 重试（maxRetry）
+</code></pre>
+
+<h3 id="调度决策状态"><a href="#调度决策状态" class="headerlink" title="调度决策状态"></a>调度决策状态</h3><table>
+<thead>
+<tr>
+<th>状态</th>
+<th>描述</th>
+<th>常见原因</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Unschedulable</strong></td>
+<td>无法调度</td>
+<td>资源不足&#x2F;约束冲突</td>
+</tr>
+<tr>
+<td><strong>Wait</strong></td>
+<td>等待依赖</td>
+<td>DAG前置任务未完成</td>
+</tr>
+<tr>
+<td><strong>Pending</strong></td>
+<td>排队中</td>
+<td>队列配额不足</td>
+</tr>
+<tr>
+<td><strong>Scheduled</strong></td>
+<td>已调度</td>
+<td>成功分配节点</td>
+</tr>
+</tbody></table>
+<h2 id="六、实操：调度器问题诊断"><a href="#六、实操：调度器问题诊断" class="headerlink" title="六、实操：调度器问题诊断"></a>六、实操：调度器问题诊断</h2><h3 id="1-PodGroup-长期-Pending"><a href="#1-PodGroup-长期-Pending" class="headerlink" title="1. PodGroup 长期 Pending"></a>1. PodGroup 长期 Pending</h3><p><strong>诊断命令</strong>：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><code class="hljs bash"><span class="hljs-comment"># 查看事件</span><br>kubectl describe podgroup &lt;name&gt;<br><br><span class="hljs-comment"># 检查调度器日志</span><br>kubectl logs -n volcano-system volcano-scheduler-xxx | grep &lt;job-name&gt;<br></code></pre></td></tr></table></figure>
+
+<p><strong>常见原因</strong>：</p>
+<ul>
+<li><code>minAvailable</code> &gt; 可用资源</li>
+<li>节点选择器&#x2F;污点不匹配</li>
+<li>队列资源配额不足</li>
+</ul>
+<h3 id="2-调度性能优化"><a href="#2-调度性能优化" class="headerlink" title="2. 调度性能优化"></a>2. 调度性能优化</h3><p><strong>配置示例</strong>：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><code class="hljs yaml"><span class="hljs-comment"># volcano-scheduler-configmap.yaml</span><br><span class="hljs-attr">actions:</span> <span class="hljs-string">&quot;enqueue, allocate, backfill&quot;</span><br><span class="hljs-attr">arguments:</span><br>  <span class="hljs-attr">allocate.nodeorder.binpack:</span> <span class="hljs-string">&quot;cpu,memory&quot;</span><br>  <span class="hljs-attr">batch.scheduler.timeout:</span> <span class="hljs-string">&quot;10s&quot;</span><br></code></pre></td></tr></table></figure>
+
+<p><strong>调优参数</strong>：</p>
+<ul>
+<li><code>batch.scheduler.timeout</code>：会话超时时间</li>
+<li><code>cache.workers</code>：并发处理数</li>
+<li><code>profiling.enable</code>：启用性能分析</li>
+</ul>
+<h2 id="七、学习路径建议"><a href="#七、学习路径建议" class="headerlink" title="七、学习路径建议"></a>七、学习路径建议</h2><h3 id="1-概念理解顺序"><a href="#1-概念理解顺序" class="headerlink" title="1. 概念理解顺序"></a>1. 概念理解顺序</h3><pre><code class=" mermaid">graph LR
+    A[PodGroup] --&gt; B[VolcanoJob]
+    B --&gt; C[Queue]
+    C --&gt; D[调度会话]
+    D --&gt; E[调度动作]
+    E --&gt; F[调度插件]
+</code></pre>
+
+<h3 id="2-实践路线"><a href="#2-实践路线" class="headerlink" title="2. 实践路线"></a>2. 实践路线</h3><ol>
+<li>部署Volcano集群</li>
+<li>提交基础VolcanoJob</li>
+<li>观察Gang调度行为</li>
+<li>配置多优先级队列</li>
+<li>实现任务依赖DAG</li>
+<li>开发自定义插件</li>
+</ol>
+<blockquote>
+<p><strong>深度理解建议</strong>：阅读源码核心路径：</p>
+<ul>
+<li>调度入口：<code>pkg/scheduler/scheduler.go</code> </li>
+<li>Gang插件：<code>pkg/plugins/gang</code></li>
+<li>分配逻辑：<code>pkg/scheduler/actions/allocate</code> </li>
+<li>会话管理：<code>pkg/scheduler/framework</code></li>
+</ul>
+</blockquote>
+<p>通过结合理论学习和实践操作，你将全面掌握Volcano调度器的核心机制和工作原理。</p>
+
+                
+              </div>
+            
+            <hr/>
+            <div>
+              <div class="post-metas my-3">
+  
+  
+</div>
+
+
+              
+  
+
+  <div class="license-box my-3">
+    <div class="license-title">
+      <div>volcano调度器工作原理</div>
+      <div>http://guy-18.github.io/2025/08/06/volcano调度器工作原理/</div>
+    </div>
+    <div class="license-meta">
+      
+        <div class="license-meta-item">
+          <div>作者</div>
+          <div>John</div>
+        </div>
+      
+      
+        <div class="license-meta-item license-meta-date">
+          <div>发布于</div>
+          <div>2025年8月6日</div>
+        </div>
+      
+      
+      
+        <div class="license-meta-item">
+          <div>许可协议</div>
+          <div>
+            
+              
+              
+                <a class="print-no-link" target="_blank" href="https://creativecommons.org/licenses/by/4.0/">
+                  <span class="hint--top hint--rounded" aria-label="BY - 署名">
+                    <i class="iconfont icon-cc-by"></i>
+                  </span>
+                </a>
+              
+            
+          </div>
+        </div>
+      
+    </div>
+    <div class="license-icon iconfont"></div>
+  </div>
+
+
+
+              
+                <div class="post-prevnext my-3">
+                  <article class="post-prev col-6">
+                    
+                    
+                      <a href="/2025/08/08/apt-get%E7%90%86%E8%A7%A3/" title="apt-get理解">
+                        <i class="iconfont icon-arrowleft"></i>
+                        <span class="hidden-mobile">apt-get理解</span>
+                        <span class="visible-mobile">上一篇</span>
+                      </a>
+                    
+                  </article>
+                  <article class="post-next col-6">
+                    
+                    
+                      <a href="/2025/07/26/volcano%E6%A0%B8%E5%BF%83%E6%A6%82%E5%BF%B5%E5%85%A5%E9%97%A8/" title="volcano核心概念入门">
+                        <span class="hidden-mobile">volcano核心概念入门</span>
+                        <span class="visible-mobile">下一篇</span>
+                        <i class="iconfont icon-arrowright"></i>
+                      </a>
+                    
+                  </article>
+                </div>
+              
+            </div>
+
+            
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+  <aside class="sidebar" style="margin-left: -1rem">
+    <div id="toc">
+  <p class="toc-header">
+    <i class="iconfont icon-list"></i>
+    <span>目录</span>
+  </p>
+  <div class="toc-body" id="toc-body"></div>
+</div>
+
+
+
+  </aside>
+
+
+    </div>
+  </div>
+</div>
+
+
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+
+
+
+
+    
+
+    
+      <a id="scroll-top-button" aria-label="TOP" href="#" role="button">
+        <i class="iconfont icon-arrowup" aria-hidden="true"></i>
+      </a>
+    
+
+    
+      <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header text-center">
+        <h4 class="modal-title w-100 font-weight-bold">搜索</h4>
+        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body mx-3">
+        <div class="md-form mb-5">
+          <input type="text" id="local-search-input" class="form-control validate">
+          <label data-error="x" data-success="v" for="local-search-input">关键词</label>
+        </div>
+        <div class="list-group" id="local-search-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+    
+
+    
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+  
+    <div class="footer-content">
+       <a href="https://hexo.io" target="_blank" rel="nofollow noopener"><span>Hexo</span></a> <i class="iconfont icon-love"></i> <a href="https://github.com/fluid-dev/hexo-theme-fluid" target="_blank" rel="nofollow noopener"><span>Fluid</span></a> 
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+
+  <!-- Scripts -->
+  
+  <script  src="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.js" ></script>
+  <link  rel="stylesheet" href="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.css" />
+
+  <script>
+    NProgress.configure({"showSpinner":false,"trickleSpeed":100})
+    NProgress.start()
+    window.addEventListener('load', function() {
+      NProgress.done();
+    })
+  </script>
+
+
+<script  src="https://lib.baomitu.com/jquery/3.6.4/jquery.min.js" ></script>
+<script  src="https://lib.baomitu.com/twitter-bootstrap/4.6.1/js/bootstrap.min.js" ></script>
+<script  src="/js/events.js" ></script>
+<script  src="/js/plugins.js" ></script>
+
+
+  <script  src="https://lib.baomitu.com/typed.js/2.0.12/typed.min.js" ></script>
+  <script>
+    (function (window, document) {
+      var typing = Fluid.plugins.typing;
+      var subtitle = document.getElementById('subtitle');
+      if (!subtitle || !typing) {
+        return;
+      }
+      var text = subtitle.getAttribute('data-typed-text');
+      
+        typing(text);
+      
+    })(window, document);
+  </script>
+
+
+
+
+  
+    <script  src="/js/img-lazyload.js" ></script>
+  
+
+
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/tocbot/4.20.1/tocbot.min.js', function() {
+    var toc = jQuery('#toc');
+    if (toc.length === 0 || !window.tocbot) { return; }
+    var boardCtn = jQuery('#board-ctn');
+    var boardTop = boardCtn.offset().top;
+
+    window.tocbot.init(Object.assign({
+      tocSelector     : '#toc-body',
+      contentSelector : '.markdown-body',
+      linkClass       : 'tocbot-link',
+      activeLinkClass : 'tocbot-active-link',
+      listClass       : 'tocbot-list',
+      isCollapsedClass: 'tocbot-is-collapsed',
+      collapsibleClass: 'tocbot-is-collapsible',
+      scrollSmooth    : true,
+      includeTitleTags: true,
+      headingsOffset  : -boardTop,
+    }, CONFIG.toc));
+    if (toc.find('.toc-list-item').length > 0) {
+      toc.css('visibility', 'visible');
+    }
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('tocbot' in window) {
+        tocbot.refresh();
+        var toc = jQuery('#toc');
+        if (toc.length === 0 || !tocbot) {
+          return;
+        }
+        if (toc.find('.toc-list-item').length > 0) {
+          toc.css('visibility', 'visible');
+        }
+      }
+    });
+  });
+</script>
+
+
+  <script src=https://lib.baomitu.com/clipboard.js/2.0.11/clipboard.min.js></script>
+
+  <script>Fluid.plugins.codeWidget();</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/anchor-js/5.0.0/anchor.min.js', function() {
+    window.anchors.options = {
+      placement: CONFIG.anchorjs.placement,
+      visible  : CONFIG.anchorjs.visible
+    };
+    if (CONFIG.anchorjs.icon) {
+      window.anchors.options.icon = CONFIG.anchorjs.icon;
+    }
+    var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+    var res = [];
+    for (var item of el) {
+      res.push('.markdown-body > ' + item.trim());
+    }
+    if (CONFIG.anchorjs.placement === 'left') {
+      window.anchors.options.class = 'anchorjs-link-left';
+    }
+    window.anchors.add(res.join(', '));
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('anchors' in window) {
+        anchors.removeAll();
+        var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+        var res = [];
+        for (var item of el) {
+          res.push('.markdown-body > ' + item.trim());
+        }
+        if (CONFIG.anchorjs.placement === 'left') {
+          anchors.options.class = 'anchorjs-link-left';
+        }
+        anchors.add(res.join(', '));
+      }
+    });
+  });
+</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.js', function() {
+    Fluid.plugins.fancyBox();
+  });
+</script>
+
+
+  <script>Fluid.plugins.imageCaption();</script>
+
+  <script  src="/js/local-search.js" ></script>
+
+
+
+
+
+<!-- 主题的启动项，将它保持在最底部 -->
+<!-- the boot of the theme, keep it at the bottom -->
+<script  src="/js/boot.js" ></script>
+
+
+  
+
+  <noscript>
+    <div class="noscript-warning">博客在允许 JavaScript 运行的环境下浏览效果更佳</div>
+  </noscript>
+</body>
+</html>
