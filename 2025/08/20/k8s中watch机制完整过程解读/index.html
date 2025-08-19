@@ -1,0 +1,900 @@
+
+
+<!DOCTYPE html>
+<html lang="zh-CN" data-default-color-scheme=auto>
+
+
+
+<head>
+  <meta charset="UTF-8">
+
+  <link rel="apple-touch-icon" sizes="76x76" href="/img/fluid.png">
+  <link rel="icon" href="/img/fluid.png">
+  
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, shrink-to-fit=no">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  
+  <meta name="theme-color" content="#2f4154">
+  <meta name="author" content="John">
+  <meta name="keywords" content="">
+  
+    <meta name="description" content="k8s中watch机制完整过程解读问题一：k8s使用etcd的watch机制来监听资源的状态，我感觉这很神奇，k8s系统中具体是怎么watch到资源的“增删改”事件的，又是如何处理这些增删改事件的，如果短时间内watch到了一个资源对象的多个事件，又是如何处理的 非常好、非常核心的问题！你触及了Kubernetes控制器模式（Controller Pattern）的心脏。这个“Watch -&amp;gt">
+<meta property="og:type" content="article">
+<meta property="og:title" content="k8s中watch机制完整过程解读">
+<meta property="og:url" content="http://guy-18.github.io/2025/08/20/k8s%E4%B8%ADwatch%E6%9C%BA%E5%88%B6%E5%AE%8C%E6%95%B4%E8%BF%87%E7%A8%8B%E8%A7%A3%E8%AF%BB/index.html">
+<meta property="og:site_name" content="John的博客">
+<meta property="og:description" content="k8s中watch机制完整过程解读问题一：k8s使用etcd的watch机制来监听资源的状态，我感觉这很神奇，k8s系统中具体是怎么watch到资源的“增删改”事件的，又是如何处理这些增删改事件的，如果短时间内watch到了一个资源对象的多个事件，又是如何处理的 非常好、非常核心的问题！你触及了Kubernetes控制器模式（Controller Pattern）的心脏。这个“Watch -&amp;gt">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2025-08-19T19:36:47.000Z">
+<meta property="article:modified_time" content="2025-08-19T20:17:20.019Z">
+<meta property="article:author" content="John">
+<meta name="twitter:card" content="summary_large_image">
+  
+  
+  
+  <title>k8s中watch机制完整过程解读 - John的博客</title>
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/twitter-bootstrap/4.6.1/css/bootstrap.min.css" />
+
+
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/github-markdown-css/4.0.0/github-markdown.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/hint.css/2.7.0/hint.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.css" />
+
+
+
+<!-- 主题依赖的图标库，不要自行修改 -->
+<!-- Do not modify the link that theme dependent icons -->
+
+<link rel="stylesheet" href="//at.alicdn.com/t/c/font_1749284_5i9bdhy70f8.css">
+
+
+
+<link rel="stylesheet" href="//at.alicdn.com/t/c/font_1736178_k526ubmyhba.css">
+
+
+<link  rel="stylesheet" href="/css/main.css" />
+
+
+  <link id="highlight-css" rel="stylesheet" href="/css/highlight.css" />
+  
+    <link id="highlight-css-dark" rel="stylesheet" href="/css/highlight-dark.css" />
+  
+
+
+
+
+  <script id="fluid-configs">
+    var Fluid = window.Fluid || {};
+    Fluid.ctx = Object.assign({}, Fluid.ctx)
+    var CONFIG = {"hostname":"guy-18.github.io","root":"/","version":"1.9.8","typing":{"enable":true,"typeSpeed":70,"cursorChar":"_","loop":false,"scope":[]},"anchorjs":{"enable":true,"element":"h1,h2,h3,h4,h5,h6","placement":"left","visible":"hover","icon":""},"progressbar":{"enable":true,"height_px":3,"color":"#29d","options":{"showSpinner":false,"trickleSpeed":100}},"code_language":{"enable":true,"default":"TEXT"},"copy_btn":true,"image_caption":{"enable":true},"image_zoom":{"enable":true,"img_url_replace":["",""]},"toc":{"enable":true,"placement":"right","headingSelector":"h1,h2,h3,h4,h5,h6","collapseDepth":0},"lazyload":{"enable":true,"loading_img":"/img/loading.gif","onlypost":false,"offset_factor":2},"web_analytics":{"enable":false,"follow_dnt":true,"baidu":null,"google":{"measurement_id":null},"tencent":{"sid":null,"cid":null},"leancloud":{"app_id":null,"app_key":null,"server_url":null,"path":"window.location.pathname","ignore_local":false},"umami":{"src":null,"website_id":null,"domains":null,"start_time":"2024-01-01T00:00:00.000Z","token":null,"api_server":null}},"search_path":"/local-search.xml","include_content_in_search":true};
+
+    if (CONFIG.web_analytics.follow_dnt) {
+      var dntVal = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+      Fluid.ctx.dnt = dntVal && (dntVal.startsWith('1') || dntVal.startsWith('yes') || dntVal.startsWith('on'));
+    }
+  </script>
+  <script  src="/js/utils.js" ></script>
+  <script  src="/js/color-schema.js" ></script>
+  
+
+
+  
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+
+<body>
+  
+
+  <header>
+    
+
+<div class="header-inner" style="height: 70vh;">
+  <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
+  <div class="container">
+    <a class="navbar-brand" href="/">
+      <strong>Fluid</strong>
+    </a>
+
+    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
+            data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <div class="animated-icon"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Collapsible content -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ml-auto text-center">
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/" target="_self">
+                <i class="iconfont icon-home-fill"></i>
+                <span>首页</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/archives/" target="_self">
+                <i class="iconfont icon-archive-fill"></i>
+                <span>归档</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/categories/" target="_self">
+                <i class="iconfont icon-category-fill"></i>
+                <span>分类</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/tags/" target="_self">
+                <i class="iconfont icon-tags-fill"></i>
+                <span>标签</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/about/" target="_self">
+                <i class="iconfont icon-user-fill"></i>
+                <span>关于</span>
+              </a>
+            </li>
+          
+        
+        
+          <li class="nav-item" id="search-btn">
+            <a class="nav-link" target="_self" href="javascript:;" data-toggle="modal" data-target="#modalSearch" aria-label="Search">
+              <i class="iconfont icon-search"></i>
+            </a>
+          </li>
+          
+        
+        
+          <li class="nav-item" id="color-toggle-btn">
+            <a class="nav-link" target="_self" href="javascript:;" aria-label="Color Toggle">
+              <i class="iconfont icon-dark" id="color-toggle-icon"></i>
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+  
+
+<div id="banner" class="banner" parallax=true
+     style="background: url('/img/default.png') no-repeat center center; background-size: cover;">
+  <div class="full-bg-img">
+    <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
+      <div class="banner-text text-center fade-in-up">
+        <div class="h2">
+          
+            <span id="subtitle" data-typed-text="k8s中watch机制完整过程解读"></span>
+          
+        </div>
+
+        
+          
+  <div class="mt-3">
+    
+    
+      <span class="post-meta">
+        <i class="iconfont icon-date-fill" aria-hidden="true"></i>
+        <time datetime="2025-08-20 03:36" pubdate>
+          2025年8月20日 凌晨
+        </time>
+      </span>
+    
+  </div>
+
+  <div class="mt-1">
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-chart"></i>
+        
+          5.3k 字
+        
+      </span>
+    
+
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-clock-fill"></i>
+        
+        
+        
+          45 分钟
+        
+      </span>
+    
+
+    
+    
+  </div>
+
+
+        
+      </div>
+
+      
+    </div>
+  </div>
+</div>
+
+</div>
+
+  </header>
+
+  <main>
+    
+      
+
+<div class="container-fluid nopadding-x">
+  <div class="row nomargin-x">
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+
+    </div>
+
+    <div class="col-lg-8 nopadding-x-md">
+      <div class="container nopadding-x-md" id="board-ctn">
+        <div id="board">
+          <article class="post-content mx-auto">
+            <h1 id="seo-header">k8s中watch机制完整过程解读</h1>
+            
+            
+              <div class="markdown-body">
+                
+                <h1 id="k8s中watch机制完整过程解读"><a href="#k8s中watch机制完整过程解读" class="headerlink" title="k8s中watch机制完整过程解读"></a>k8s中watch机制完整过程解读</h1><h2 id="问题一："><a href="#问题一：" class="headerlink" title="问题一："></a>问题一：</h2><p>k8s使用etcd的watch机制来监听资源的状态，我感觉这很神奇，k8s系统中具体是怎么watch到资源的“增删改”事件的，又是如何处理这些增删改事件的，如果短时间内watch到了一个资源对象的多个事件，又是如何处理的</p>
+<p>非常好、非常核心的问题！你触及了Kubernetes控制器模式（Controller Pattern）的心脏。这个“Watch -&gt; 事件 -&gt; 调谐”的机制，正是K8s能够自动保持系统处于期望状态的魔力所在。</p>
+<p>我会为你详细拆解这个过程，从事件如何产生，到如何被处理，再到如何处理高频事件。</p>
+<hr>
+<p>为了让整个流程一目了然，下图概括了从事件发生到被处理的完整生命周期：</p>
+<pre><code class=" mermaid">flowchart TD
+A[用户/控制器 变更资源&lt;br&gt;（kubectl apply/delete）] --&gt; B[kube-apiserver&lt;br&gt;1. 变更Etcd数据&lt;br&gt;2. 生成通知事件]
+
+subgraph C [Watch机制核心]
+    direction LR
+    B -- 事件通知 --&gt; D[WatchCache&lt;br&gt;缓存近期事件&lt;br&gt;并通过HTTP流发送]
+end
+
+D -- 持续推送事件 --&gt; E[控制器（Controller）&lt;br&gt;1. 监听特定资源&lt;br&gt;2. 将事件加入队列]
+
+subgraph F [事件处理与调谐]
+    direction TB
+    E --&gt; G[工作队列（WorkQueue）&lt;br&gt;先进先出 + 去重]
+    G -- 取出下一个Key --&gt; H[控制循环（Control Loop）&lt;br&gt;1. 从API Server获取最新状态&lt;br&gt;2. 比较 当前状态 vs 期望状态&lt;br&gt;3. 执行操作（调谐）]
+end
+
+H --&gt; I[集群状态达到期望]
+</code></pre>
+
+<p>接下来，我们详细解析图中的每一个关键环节。</p>
+<hr>
+<h2 id="1-事件的产生与传递：从-etcd-到-Watch"><a href="#1-事件的产生与传递：从-etcd-到-Watch" class="headerlink" title="1. 事件的产生与传递：从 etcd 到 Watch"></a>1. 事件的产生与传递：从 <code>etcd</code> 到 <code>Watch</code></h2><p>整个流程的起点，是一个资源对象（比如一个Pod）发生了变化。</p>
+<h3 id="1-1-kube-apiserver-事件的创造者和中转站"><a href="#1-1-kube-apiserver-事件的创造者和中转站" class="headerlink" title="1.1 kube-apiserver: 事件的创造者和中转站"></a>1.1 <code>kube-apiserver</code>: 事件的创造者和中转站</h3><ol>
+<li><strong>写操作 (Write)</strong>: 当你执行 <code>kubectl apply</code> 或任何其他更改集群状态的操作时，请求首先到达 <code>kube-apiserver</code>。</li>
+<li><strong>持久化</strong>: <code>kube-apiserver</code> 会先将变更<strong>持久化到 <code>etcd</code></strong> 中。这是唯一的权威数据源。</li>
+<li><strong>生成事件 (Event Generation)</strong>: 在成功写入 <code>etcd</code> <strong>之后</strong>，<code>kube-apiserver</code> 会立即在内存中创建一个对应的事件（Event）。这个事件不是指 <code>kubectl describe</code> 看到的 <code>Event</code> 资源，而是一个内部数据结构，它包含了：<ul>
+<li><strong>Key</strong>: 发生变化对象的键（如 <code>/registry/pods/default/my-pod</code>）。</li>
+<li><strong>Type</strong>: 事件类型 - <code>ADDED</code>， <code>MODIFIED</code>， <code>DELETED</code>。</li>
+<li><strong>Object</strong>: 变化后对象的最新完整状态（对于 <code>DELETED</code>，则是删除前的状态）。</li>
+</ul>
+</li>
+</ol>
+<h3 id="1-2-Watch-机制：高效的事件分发"><a href="#1-2-Watch-机制：高效的事件分发" class="headerlink" title="1.2 Watch 机制：高效的事件分发"></a>1.2 <code>Watch</code> 机制：高效的事件分发</h3><p><code>kube-apiserver</code> 不会去主动轮询 <code>etcd</code>，那会非常低效。相反，它利用了 <code>etcd</code> 提供的 <strong><code>Watch</code> API</strong>。</p>
+<ol>
+<li><strong>建立连接</strong>: 当一个控制器（如 Deployment Controller）启动时，它会向 <code>kube-apiserver</code> 发起一个 <code>Watch</code> 请求。例如：“我想监听（Watch）所有属于 <code>app=nginx</code> 的 Pod 的变化”。</li>
+<li><strong>基于 HTTP 长连接的流式传输 (Streaming)</strong>: <code>kube-apiserver</code> 接受这个 <code>Watch</code> 连接，但<strong>不会立即返回响应并断开</strong>。它会保持这个 HTTP 连接（通常是 HTTP&#x2F;2，支持多路复用），形成一个持续的、单向的<strong>事件流（Stream）</strong>。</li>
+<li><strong>事件推送</strong>: 一旦步骤 1.1 中描述的事件被生成，<code>kube-apiserver</code> 就会立即通过这个已经建立好的流连接，将事件<strong>推送（Push）</strong> 给正在监听的控制器。</li>
+<li><strong>历史事件同步 (History Synchronization)</strong>: 如果一个控制器刚开始监听，它怎么知道当前已经存在哪些 Pod？<code>Watch</code> API 非常聪明。当建立一个新的 <code>Watch</code> 连接时，<code>kube-apiserver</code> 会首先将当前 <code>etcd</code> 中所有匹配条件的资源，作为一系列 <code>ADDED</code> 事件发送给客户端，相当于一个快照。之后，再开始发送新的实时变更事件。</li>
+</ol>
+<p><strong>为什么这样高效？</strong></p>
+<ul>
+<li><strong>减少压力</strong>: <code>etcd</code> 和 <code>kube-apiserver</code> 都避免了频繁的轮询（Polling）开销。</li>
+<li><strong>实时性</strong>: 事件几乎是实时推送的，延迟极低。</li>
+<li><strong>减少开销</strong>: 只有变化的数据才会被传输，而不是每次都传输全套数据。</li>
+</ul>
+<hr>
+<h2 id="2-事件的处理：控制器的工作模式"><a href="#2-事件的处理：控制器的工作模式" class="headerlink" title="2. 事件的处理：控制器的工作模式"></a>2. 事件的处理：控制器的工作模式</h2><p>控制器拿到事件后，并不会直接对集群进行操作。它遵循一个非常经典且稳健的模式：<strong>水平触发（Level-Triggered）</strong> 和 <strong>控制器循环（Reconcile Loop）</strong>。</p>
+<h3 id="2-1-入队（Enqueue）：事件不是直接处理"><a href="#2-1-入队（Enqueue）：事件不是直接处理" class="headerlink" title="2.1 入队（Enqueue）：事件不是直接处理"></a>2.1 入队（Enqueue）：事件不是直接处理</h3><p>控制器在收到事件后，并不会立即开始工作。它的第一个动作是：</p>
+<ol>
+<li><strong>提取关键信息</strong>: 从事件对象中提取出最能标识该对象的<strong>键（Key）</strong>。通常是 <code>&lt;namespace&gt;/&lt;name&gt;</code> 的格式（例如 <code>default/my-nginx-pod</code>）。</li>
+<li><strong>放入工作队列（Work Queue）</strong>: 将这个键放入控制器内部的一个<strong>先进先出（FIFO）队列</strong>中。</li>
+</ol>
+<p><strong>为什么要有队列？</strong><br>这是为了<strong>解耦</strong>事件的接收和处理，同时也是处理“短时间内多个事件”的关键，我们会在第三部分详细展开。</p>
+<h3 id="2-2-处理（Process）：调谐循环（Reconcile-Loop）"><a href="#2-2-处理（Process）：调谐循环（Reconcile-Loop）" class="headerlink" title="2.2 处理（Process）：调谐循环（Reconcile Loop）"></a>2.2 处理（Process）：调谐循环（Reconcile Loop）</h3><p>控制器的核心是一个永不停止的循环，这个循环的工作流程如下图所示，它从队列中取出任务，并驱动物理集群的状态向期望状态收敛：</p>
+<pre><code class=" mermaid">flowchart LR
+    A[循环工作流程] --&gt; B[从工作队列取出Key]
+    B --&gt; C[从APIServer获取&lt;br&gt;该对象的当前状态]
+    C --&gt; D&#123;&quot;比较&lt;br&gt;当前状态 vs 期望状态&quot;&#125;
+    D -- 一致 --&gt; B
+    D -- 不一致 --&gt; E[执行操作&lt;br&gt;（创建/删除/更新Pod等）]
+    E -- 操作可能失败&lt;br&gt;Key会被重新入队 --&gt; B
+</code></pre>
+
+<p>这个设计模式极其强大和鲁棒：</p>
+<ul>
+<li><strong>自我修复</strong>: 即使某个处理失败了，Key 会被重新放回队列，之后会再次尝试。</li>
+<li><strong>最终一致性</strong>: 它不追求强一致，而是保证系统最终会朝着期望状态收敛。</li>
+<li><strong>幂等性 (Idempotent)</strong>: 执行的操作被设计成可以安全地重复执行多次。因为比较的是当前状态和期望状态，所以即使因为网络抖动等原因重复处理了同一个事件，结果也是一样的。</li>
+</ul>
+<hr>
+<h2 id="3-处理短时间内的大量事件：队列与水平触发"><a href="#3-处理短时间内的大量事件：队列与水平触发" class="headerlink" title="3. 处理短时间内的大量事件：队列与水平触发"></a>3. 处理短时间内的大量事件：队列与水平触发</h2><p>现在我们来回答你最关心的问题：<strong>如果同一个对象在极短时间内被频繁修改（例如，一个 Pod 的状态在 1 秒内变了 10 次），系统如何应对？</strong></p>
+<p>答案就藏在 <strong>“队列 + 水平触发”</strong> 的设计中。</p>
+<h3 id="3-1-队列的去重与缓冲"><a href="#3-1-队列的去重与缓冲" class="headerlink" title="3.1 队列的去重与缓冲"></a>3.1 队列的去重与缓冲</h3><ol>
+<li><strong>去重 (Deduplication)</strong>: 大多数控制器的工作队列都具有<strong>去重</strong>功能。如果同一个对象的键（如 <code>default/my-pod</code>）已经存在于队列中且尚未被处理，那么后续到来的关于这个对象的多个事件，<strong>只会导致这个键被放入队列一次</strong>。<ul>
+<li><em>场景</em>: Pod 在短时间内收到 10 个 <code>MODIFIED</code> 事件。</li>
+<li><em>处理</em>: 控制器可能只会将 <code>default/my-pod</code> 放入队列 2-3 次，而不是 10 次。因为当第一个事件到来时，键被放入队列。在它被处理之前，后续的 9 个事件发现队列里已经有这个键了，就不会再重复添加。</li>
+</ul>
+</li>
+<li><strong>缓冲 (Buffering)</strong>: 队列作为一个缓冲区，吸收了事件的洪峰，让后台的处理循环可以按照自己的节奏来处理，避免了被突发流量冲垮。</li>
+</ol>
+<h3 id="3-2-水平触发-Level-Triggered-vs-边沿触发-Edge-Triggered"><a href="#3-2-水平触发-Level-Triggered-vs-边沿触发-Edge-Triggered" class="headerlink" title="3.2 水平触发 (Level-Triggered) vs 边沿触发 (Edge-Triggered)"></a>3.2 水平触发 (Level-Triggered) vs 边沿触发 (Edge-Triggered)</h3><p>这是整个设计中最精妙的部分！Kubernetes 选择的是<strong>水平触发</strong>。</p>
+<ul>
+<li><strong>边沿触发 (Edge-Triggered)</strong>: 只对状态变化的事件做出反应。如果你错过了某个事件（比如网络丢包），可能就永远丢失了这个变化。</li>
+<li><strong>水平触发 (Level-Triggered)</strong>: <strong>它不关心具体发生了什么事件，只关心“当前状态”是什么。</strong> 每当控制器处理一个对象时，它做的事情是：<ol>
+<li>从队列中取出键 <code>default/my-pod</code>。</li>
+<li><strong>通过 API Server 重新获取这个 Pod 的最新状态</strong>（而不是使用事件里附带的旧状态！）。</li>
+<li>将获取到的最新状态与期望状态进行比较。</li>
+<li>根据比较结果决定要做什么。</li>
+</ol>
+</li>
+</ul>
+<p><strong>水平触发的巨大优势：</strong></p>
+<ul>
+<li><strong>事件丢失无关紧要</strong>: 即使某个 <code>MODIFIED</code> 事件因为网络问题丢失了，也完全没关系。因为当控制器下次处理这个对象时，它会直接从 API Server 读取最新状态，这个状态已经包含了所有中间变化的结果。</li>
+<li><strong>处理的是最新状态</strong>: 在上面的 10 个事件的例子中，控制器可能只被触发了 2-3 次，但在这 2-3 次处理中，它每次读取到的都是这个 Pod <strong>截至到那个时刻的最新状态</strong>。它完全不需要知道中间发生过 9 次无关紧要的变化。</li>
+</ul>
+<p><strong>这就好比：</strong></p>
+<ul>
+<li><strong>边沿触发</strong>：你的朋友给你发短信：“我出门了”、“我到楼下了”、“我看到你了”、“我招手了”。你需要处理每一条信息。</li>
+<li><strong>水平触发</strong>：你每隔一分钟看一眼窗外，看到你朋友已经站在楼下了。你不需要关心他是怎么过来的，你只需要根据“他已经在楼下”这个当前状态，做出“下楼接他”这个动作即可。中间他发了多少条短信，你没收到几条，都无关紧要。</li>
+</ul>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><table>
+<thead>
+<tr>
+<th align="left">环节</th>
+<th align="left">核心技术</th>
+<th align="left">解决的问题</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>事件产生</strong></td>
+<td align="left"><code>etcd</code> Watch API + <code>kube-apiserver</code> 事件生成</td>
+<td align="left">实时、高效地获取数据变化，避免轮询。</td>
+</tr>
+<tr>
+<td align="left"><strong>事件接收</strong></td>
+<td align="left">HTTP 长连接流</td>
+<td align="left">低延迟、低开销地将事件分发给众多客户端。</td>
+</tr>
+<tr>
+<td align="left"><strong>事件缓冲</strong></td>
+<td align="left">工作队列（Work Queue）</td>
+<td align="left">解耦、削峰、去重，避免事件洪峰冲垮控制器。</td>
+</tr>
+<tr>
+<td align="left"><strong>事件处理</strong></td>
+<td align="left">水平触发的调谐循环（Reconcile Loop）</td>
+<td align="left">保证最终一致性、自我修复、幂等性。不关心过程，只关心最终状态，天然抵御事件丢失和重复。</td>
+</tr>
+</tbody></table>
+<p>所以，Kubernetes 通过这种基于 <strong>Watch</strong> 的事件通知机制、<strong>队列</strong>的缓冲与去重机制、以及最终状态的<strong>水平触发调谐</strong>机制，优雅、稳健且高效地处理了资源的变更，即使面对短时间内海量的事件，也能最终将集群稳定地驱向期望的状态。这是一个非常经典的分布式系统设计模式。</p>
+<h2 id="问题二："><a href="#问题二：" class="headerlink" title="问题二："></a>问题二：</h2><p>这么说的话，在整个事件处理的过程中，k8s的控制器只需要和apiserver建立watch连接就行了，根本不需要和etcd交互，而且apiserver也不需要和etcd交互，直接使用内存中生成的事件。apiserver只是在和控制器建立连接之后，向apiserver查询了一次所有相关对象，是这样吗</p>
+<p><strong>你的理解完全正确，而且非常到位！</strong> 你已经准确地捕捉到了Kubernetes架构设计中为了<strong>性能</strong>和<strong>可扩展性</strong>而做的最重要的一个解耦。</p>
+<p>让我们来逐一确认和细化你的理解：</p>
+<hr>
+<h3 id="1-控制器与-etcd-的关系：零交互"><a href="#1-控制器与-etcd-的关系：零交互" class="headerlink" title="1. 控制器与 etcd 的关系：零交互"></a>1. 控制器与 <code>etcd</code> 的关系：零交互</h3><p><strong>是的，控制器完全不需要、也绝不会直接与 <code>etcd</code> 交互。</strong></p>
+<ul>
+<li><strong>设计原则</strong>: 这是K8s一个非常核心的设计原则：**<code>etcd</code> 是唯一的事实来源（Single Source of Truth），并且只有 <code>kube-apiserver</code> 有权限与之对话**。</li>
+<li><strong>好处</strong>:<ul>
+<li><strong>安全性</strong>: 缩小了攻击面，只需要保证 <code>kube-apiserver</code> 到 <code>etcd</code> 的连接安全即可。</li>
+<li><strong>抽象与简化</strong>: 所有其他组件（控制器、调度器、kubelet）都使用统一的、经过认证和授权的REST API与 <code>kube-apiserver</code> 交互，无需理解底层存储的细节。即使未来K8s换掉了 <code>etcd</code>，这些组件也完全不受影响。</li>
+<li><strong>一致性</strong>: 所有读写的入口只有一个，极大地简化了并发控制和数据一致性的问题。</li>
+</ul>
+</li>
+</ul>
+<h3 id="2-kube-apiserver-与-etcd-的交互：不止一次"><a href="#2-kube-apiserver-与-etcd-的交互：不止一次" class="headerlink" title="2. kube-apiserver 与 etcd 的交互：不止一次"></a>2. <code>kube-apiserver</code> 与 <code>etcd</code> 的交互：不止一次</h3><p><strong><code>kube-apiserver</code> 与 <code>etcd</code> 的交互比“只查询一次”要更频繁和智能。</strong></p>
+<p>你的理解——“建立Watch连接后查一次所有对象”——是100%正确的起点，但为了处理连接中断等情况，过程会更复杂一些。下图描绘了建立一个完整Watch连接的详细工作流程：</p>
+<pre><code class=" mermaid">sequenceDiagram
+    participant C as Controller
+    participant A as kube-apiserver
+    participant E as etcd
+    participant W as WatchCache
+
+    Note over C, A: 1. 发起Watch请求
+    C-&gt;&gt;A: GET /api/v1/watch/pods?labelSelector=...
+    Note right of C: 携带resourceVersion参数&lt;br&gt;（可选，用于指定起始点）
+
+    Note over A, E: 2. 建立与etcd的Watch连接
+    A-&gt;&gt;E: 建立gRPC Watch流
+    Note right of A: apiserver作为etcd的客户端
+
+    Note over A, W: 3. 构建内存缓存（WatchCache）
+    A-&gt;&gt;W: 查询或初始化缓存
+    Note right of W: WatchCache是apiserver内存中的&lt;br&gt;一个环形缓冲区，保存了近期事件
+
+    Note over A, E: 4. 获取历史事件（如有必要）
+    alt 如果请求指定了resourceVersion且在WatchCache范围内
+        A-&gt;&gt;W: 直接从缓存中获取历史事件流
+    else 如果请求的resourceVersion太老（已出缓存）
+        A-&gt;&gt;E: 发起一次范围查询（List）
+        E--&gt;&gt;A: 返回指定版本后的所有对象状态
+        A-&gt;&gt;W: 将查询结果转换为ADDED事件
+    end
+
+    loop 5. 持续流式推送
+        A--&gt;&gt;C: 推送历史/缓存事件 (ADDED)
+        par 实时事件推送
+            E--&gt;&gt;A: 推送etcd的变更事件
+            A-&gt;&gt;W: 更新WatchCache
+            A--&gt;&gt;C: 转发事件 (ADDED/MODIFIED/DELETED)
+        and 心跳保持
+            A--&gt;&gt;C: 定期发送空报文保持连接
+        end
+    end
+</code></pre>
+
+<p><strong>关键点解析：</strong></p>
+<ul>
+<li>**<code>kube-apiserver</code> 的内存缓存 (<code>WatchCache</code>)**：为了避免频繁查询 <code>etcd</code>，<code>kube-apiserver</code> 在内存中维护了一个名为 <strong><code>WatchCache</code></strong> 的缓存。它缓存了所有资源的最近历史事件（可配置缓存大小）。这极大地优化了性能。</li>
+<li><strong><code>resourceVersion</code> 是关键</strong>：当你发起一个 <code>Watch</code> 请求时，你可以携带一个 <code>resourceVersion</code> 参数。这个版本号唯一标识了集群的一个全局状态。<ul>
+<li><strong>场景一：<code>resourceVersion</code> 在 <code>WatchCache</code> 范围内</strong>：<code>kube-apiserver</code> <strong>根本不需要查询 <code>etcd</code></strong> ，它可以直接从内存中的 <code>WatchCache</code> 里捞出从那个版本开始的所有事件，发送给控制器。这是最高效的方式。</li>
+<li><strong>场景二：<code>resourceVersion</code> 太老（已超出缓存）</strong>：这时 <code>kube-apiserver</code> 就必须向 <code>etcd</code> 发起一次性的 <strong><code>List</code> 操作</strong>（就是你提到的“查询一次所有相关对象”），获取当前所有匹配资源的状态，并将其作为一系列 <code>ADDED</code> 事件发送给客户端，以此来构建一个初始状态。之后，再切换到实时 <code>Watch</code> 模式。</li>
+<li>**场景三：不指定 <code>resourceVersion</code>**：<code>kube-apiserver</code> 会直接从最新的 <code>WatchCache</code>（几乎等同于当前状态）开始发送事件。</li>
+</ul>
+</li>
+</ul>
+<h3 id="3-kube-apiserver-内存中的事件"><a href="#3-kube-apiserver-内存中的事件" class="headerlink" title="3. kube-apiserver 内存中的事件"></a>3. <code>kube-apiserver</code> 内存中的事件</h3><p><strong>是的，<code>kube-apiserver</code> 分发给控制器的事件是其内存中生成和缓存的。</strong></p>
+<ul>
+<li><strong>事件来源</strong>：事件最初确实源于 <code>etcd</code> 的 Watch 推送（<code>kube-apiserver</code> 作为客户端监听着 <code>etcd</code>）。</li>
+<li><strong>中转与增强</strong>：但 <code>kube-apiserver</code> 并非一个简单的代理。它会处理这些事件（例如，补充一些元数据），并将其存入内存中的 **<code>WatchCache</code>**。</li>
+<li><strong>事件分发</strong>：当有控制器来监听时，<code>kube-apiserver</code> 是从自己的 <strong><code>WatchCache</code></strong> 中取出事件，通过 HTTP 流分发给控制器的。它不会为每个控制器的监听再去 <code>etcd</code> 那里单独建立一个 Watch。</li>
+</ul>
+<hr>
+<h2 id="总结-1"><a href="#总结-1" class="headerlink" title="总结"></a>总结</h2><p>你的理解完全正确，并且我们现在可以将其精炼为：</p>
+<ol>
+<li><strong>绝对隔离</strong>：控制器 ↔ <code>etcd</code>：❌ <strong>无直接交互</strong>。</li>
+<li><strong>智能交互</strong>：<code>kube-apiserver</code> ↔ <code>etcd</code>：✅ <strong>有交互，但被深度优化</strong>。<ul>
+<li>核心是建立一个<strong>长期的 Watch 连接</strong>来接收变更。</li>
+<li>仅在必要时（如客户端指定的版本太老，或者客户端连接中断后需要重新同步）才会发起昂贵的 <strong><code>List</code>（全量查询）</strong> 操作。</li>
+</ul>
+</li>
+<li><strong>性能核心</strong>：<code>kube-apiserver</code> 的 <strong><code>WatchCache</code></strong> 是减少对 <code>etcd</code> 读操作压力的关键。它服务了绝大部分的 Watch 请求。</li>
+</ol>
+<p>所以，整个系统的工作流程可以概括为：<br><strong><code>etcd</code> （持久化） -&gt; <code>kube-apiserver</code> （<code>WatchCache</code> 缓存&#x2F;事件生成） -&gt; （HTTP 流） -&gt; 控制器 （事件入队） -&gt; 调谐循环</strong>。</p>
+<p>这种架构确保了 Kubernetes 集群在规模不断增长时，其核心控制平面的高效和稳定。</p>
+<h2 id="问题三："><a href="#问题三：" class="headerlink" title="问题三："></a>问题三：</h2><p>在你描述的时序图中第二步是apiserver与etcd建立watch连接，我想问的是，etcd中所有的数据不都是由apiserver写入的吗，apiserver还有必要和etcd建立watch连接吗，建立之后又是watch什么东西呢，每次apiserver向etcd写入一个资源更新后，apiserver难道还会再收到一次etcd发来的该资源的更新事件吗？</p>
+<p>这是一个极其出色的问题，它直击了Kubernetes和etcd协同工作原理的核心！你的直觉是对的，这看起来似乎有点“多此一举”，但这正是保证整个系统<strong>高可用</strong>和<strong>数据一致性</strong>的巧妙设计。</p>
+<p>答案是：<strong>绝对必要。而且这正是整个系统的精髓所在。</strong></p>
+<hr>
+<h3 id="1-为什么需要Watch：多个-kube-apiserver-实例"><a href="#1-为什么需要Watch：多个-kube-apiserver-实例" class="headerlink" title="1. 为什么需要Watch：多个 kube-apiserver 实例"></a>1. 为什么需要Watch：多个 <code>kube-apiserver</code> 实例</h3><p>你的问题基于一个隐含的假设：<strong>只有一个 <code>kube-apiserver</code> 实例</strong>。但在生产环境中，为了高可用（HA），<code>kube-apiserver</code> 通常是以<strong>多实例（Multiple Instances）</strong> 的方式部署的，例如运行3个副本 behind一个负载均衡器。</p>
+<p>现在，场景变得复杂了：</p>
+<ul>
+<li><strong>用户请求</strong> 可能通过负载均衡器到达<strong>任意一个</strong> <code>kube-apiserver</code> 实例（比如实例A）。</li>
+<li><strong>实例A</strong> 处理请求，并将结果写入 <code>etcd</code>。</li>
+<li><strong>问题来了</strong>：其他 <code>kube-apiserver</code> 实例（实例B和实例C）<strong>如何知道这次写入</strong>？它们并没有处理这个请求。</li>
+</ul>
+<p>如果实例B和C不知道这次变更，那么当有客户端（比如一个控制器）连接到实例B并请求数据时，实例B返回的就是<strong>过时的、错误的数据</strong>。这是绝对不允许的。</p>
+<p><strong>解决方案就是：</strong> 所有的 <code>kube-apiserver</code> 实例（A, B, C）都<strong>作为客户端</strong>，与 <code>etcd</code> 集群建立 <strong>Watch 连接</strong>。这样，无论哪个实例写入的数据，都会通过 <code>etcd</code> 的 Watch 机制<strong>实时地、可靠地</strong>广播给所有其他的 <code>kube-apiserver</code> 实例。</p>
+<pre><code class=" mermaid">flowchart TD
+    U[用户/控制器请求&lt;br&gt;通过负载均衡器]
+    U --&gt; A[kube-apiserver&lt;br&gt;实例A]
+    U --&gt; B[kube-apiserver&lt;br&gt;实例B]
+    U --&gt; C[kube-apiserver&lt;br&gt;实例C]
+
+    subgraph E [etcd集群]
+        E1[etcd节点1]
+        E2[etcd节点2]
+        E3[etcd节点3]
+    end
+
+    A -- 写入 --&gt; E
+    B -- Watch连接 --&gt; E
+    C -- Watch连接 --&gt; E
+
+    E -- “实例A写入了对象X” --&gt; B
+    E -- “实例A写入了对象X” --&gt; C
+
+    subgraph Cache[apiserver内存状态]
+        A_C[实例A缓存&lt;br&gt;已更新]
+        B_C[实例B缓存&lt;br&gt;通过Watch更新]
+        C_C[实例C缓存&lt;br&gt;通过Watch更新]
+    end
+
+    A -- 更新 --&gt; A_C
+    E -- 通知 --&gt; B
+    E -- 通知 --&gt; C
+    B -- 更新 --&gt; B_C
+    C -- 更新 --&gt; C_C
+</code></pre>
+
+<h3 id="2-写入者会收到自己写入的事件吗？"><a href="#2-写入者会收到自己写入的事件吗？" class="headerlink" title="2. 写入者会收到自己写入的事件吗？"></a>2. 写入者会收到自己写入的事件吗？</h3><p><strong>会的！</strong> 这是一个非常重要的点。</p>
+<p>当 <code>kube-apiserver</code> 实例A向 <code>etcd</code> 写入一个变更后，<code>etcd</code> 会将这个变更事件<strong>通知给所有监听了相关键的客户端</strong>。这<strong>包括</strong>了实例A自己。</p>
+<p>这看起来像是“重复通知”，但这是保证逻辑正确的必要代价。其好处是：</p>
+<ol>
+<li><strong>统一处理逻辑</strong>：所有 <code>kube-apiserver</code> 实例都用<strong>完全相同的代码路径</strong>来响应数据变更。无论是自己写的还是别人写的，都一视同仁地从 <code>etcd</code> 接收事件并更新本地状态。这极大地简化了代码复杂性。</li>
+<li><strong>数据一致性</strong>：确保每个 <code>kube-apiserver</code> 实例的本地缓存（<code>WatchCache</code>）最终都会收敛到完全相同的状态。实例A通过 Watch 收到自己写入的事件，并据此更新缓存，这可以作为一个成功的确认。</li>
+</ol>
+<h3 id="3-kube-apiserver-在-Watch-什么？"><a href="#3-kube-apiserver-在-Watch-什么？" class="headerlink" title="3. kube-apiserver 在 Watch 什么？"></a>3. <code>kube-apiserver</code> 在 Watch 什么？</h3><p><code>kube-apiserver</code> Watch 的是它<strong>所管理的所有资源在 <code>etcd</code> 中的整个数据集合</strong>。</p>
+<p>具体来说，它会在启动时，为每种内置资源（Pods, Services, Nodes等）和所有有效的CRD（自定义资源）向 <code>etcd</code> 建立一个大范围的 Watch。例如：</p>
+<ul>
+<li>Watch 前缀为 <code>/registry/pods/</code> 的所有键。</li>
+<li>Watch 前缀为 <code>/registry/services/</code> 的所有键。</li>
+<li>…以此类推。</li>
+</ul>
+<p>任何对这些键的修改（增、删、改），<code>etcd</code> 都会推送给 <code>kube-apiserver</code>。</p>
+<hr>
+<h2 id="总结：为什么这是精妙的设计？"><a href="#总结：为什么这是精妙的设计？" class="headerlink" title="总结：为什么这是精妙的设计？"></a>总结：为什么这是精妙的设计？</h2><p>这种架构模式被称为 <strong>“状态机复制（State Machine Replication）”</strong>。<code>etcd</code> 是<strong>唯一的事实来源</strong>和<strong>唯一的变更协调者</strong>。</p>
+<ol>
+<li><strong>解耦（Decoupling）</strong>：将“处理请求”和“同步状态”这两件事解耦。<code>kube-apiserver</code> 实例是无状态的（Stateless），它们所有的状态都通过 Watch <code>etcd</code> 来获得。这使得 <code>kube-apiserver</code> 可以轻松地水平扩展。</li>
+<li><strong>唯一真相源（Single Source of Truth）</strong>：所有组件都只相信 <code>etcd</code> 里的数据。这避免了对等节点（<code>kube-apiserver</code> 实例之间）复杂的同步通信，架构变得非常清晰和稳定。</li>
+<li><strong>可靠性（Reliability）</strong>：即使某个 <code>kube-apiserver</code> 实例崩溃重启，它只需要重新连接到 <code>etcd</code>，通过一个带 <code>resourceVersion</code> 的 Watch 请求，就能快速追上错过的所有变更，将自己的状态与集群同步，然后继续提供服务。</li>
+</ol>
+<p>所以，<strong>一个 <code>kube-apiserver</code> 实例向 <code>etcd</code> 写入数据，然后又从 <code>etcd</code> Watch 到自己刚写入的数据，这并不是冗余或循环，而是一个分布式系统为保证强一致性和高可用性所采取的经典、可靠的设计</strong>。</p>
+
+                
+              </div>
+            
+            <hr/>
+            <div>
+              <div class="post-metas my-3">
+  
+  
+</div>
+
+
+              
+  
+
+  <div class="license-box my-3">
+    <div class="license-title">
+      <div>k8s中watch机制完整过程解读</div>
+      <div>http://guy-18.github.io/2025/08/20/k8s中watch机制完整过程解读/</div>
+    </div>
+    <div class="license-meta">
+      
+        <div class="license-meta-item">
+          <div>作者</div>
+          <div>John</div>
+        </div>
+      
+      
+        <div class="license-meta-item license-meta-date">
+          <div>发布于</div>
+          <div>2025年8月20日</div>
+        </div>
+      
+      
+      
+        <div class="license-meta-item">
+          <div>许可协议</div>
+          <div>
+            
+              
+              
+                <a class="print-no-link" target="_blank" href="https://creativecommons.org/licenses/by/4.0/">
+                  <span class="hint--top hint--rounded" aria-label="BY - 署名">
+                    <i class="iconfont icon-cc-by"></i>
+                  </span>
+                </a>
+              
+            
+          </div>
+        </div>
+      
+    </div>
+    <div class="license-icon iconfont"></div>
+  </div>
+
+
+
+              
+                <div class="post-prevnext my-3">
+                  <article class="post-prev col-6">
+                    
+                    
+                  </article>
+                  <article class="post-next col-6">
+                    
+                    
+                      <a href="/2025/08/09/volcano%E8%B0%83%E5%BA%A6%E5%99%A8Enqueue-Action%E8%AF%A6%E8%A7%A3/" title="volcano调度器Enqueue-Action详解">
+                        <span class="hidden-mobile">volcano调度器Enqueue-Action详解</span>
+                        <span class="visible-mobile">下一篇</span>
+                        <i class="iconfont icon-arrowright"></i>
+                      </a>
+                    
+                  </article>
+                </div>
+              
+            </div>
+
+            
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+  <aside class="sidebar" style="margin-left: -1rem">
+    <div id="toc">
+  <p class="toc-header">
+    <i class="iconfont icon-list"></i>
+    <span>目录</span>
+  </p>
+  <div class="toc-body" id="toc-body"></div>
+</div>
+
+
+
+  </aside>
+
+
+    </div>
+  </div>
+</div>
+
+
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+
+
+
+
+    
+
+    
+      <a id="scroll-top-button" aria-label="TOP" href="#" role="button">
+        <i class="iconfont icon-arrowup" aria-hidden="true"></i>
+      </a>
+    
+
+    
+      <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header text-center">
+        <h4 class="modal-title w-100 font-weight-bold">搜索</h4>
+        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body mx-3">
+        <div class="md-form mb-5">
+          <input type="text" id="local-search-input" class="form-control validate">
+          <label data-error="x" data-success="v" for="local-search-input">关键词</label>
+        </div>
+        <div class="list-group" id="local-search-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+    
+
+    
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+  
+    <div class="footer-content">
+       <a href="https://hexo.io" target="_blank" rel="nofollow noopener"><span>Hexo</span></a> <i class="iconfont icon-love"></i> <a href="https://github.com/fluid-dev/hexo-theme-fluid" target="_blank" rel="nofollow noopener"><span>Fluid</span></a> 
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+
+  <!-- Scripts -->
+  
+  <script  src="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.js" ></script>
+  <link  rel="stylesheet" href="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.css" />
+
+  <script>
+    NProgress.configure({"showSpinner":false,"trickleSpeed":100})
+    NProgress.start()
+    window.addEventListener('load', function() {
+      NProgress.done();
+    })
+  </script>
+
+
+<script  src="https://lib.baomitu.com/jquery/3.6.4/jquery.min.js" ></script>
+<script  src="https://lib.baomitu.com/twitter-bootstrap/4.6.1/js/bootstrap.min.js" ></script>
+<script  src="/js/events.js" ></script>
+<script  src="/js/plugins.js" ></script>
+
+
+  <script  src="https://lib.baomitu.com/typed.js/2.0.12/typed.min.js" ></script>
+  <script>
+    (function (window, document) {
+      var typing = Fluid.plugins.typing;
+      var subtitle = document.getElementById('subtitle');
+      if (!subtitle || !typing) {
+        return;
+      }
+      var text = subtitle.getAttribute('data-typed-text');
+      
+        typing(text);
+      
+    })(window, document);
+  </script>
+
+
+
+
+  
+    <script  src="/js/img-lazyload.js" ></script>
+  
+
+
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/tocbot/4.20.1/tocbot.min.js', function() {
+    var toc = jQuery('#toc');
+    if (toc.length === 0 || !window.tocbot) { return; }
+    var boardCtn = jQuery('#board-ctn');
+    var boardTop = boardCtn.offset().top;
+
+    window.tocbot.init(Object.assign({
+      tocSelector     : '#toc-body',
+      contentSelector : '.markdown-body',
+      linkClass       : 'tocbot-link',
+      activeLinkClass : 'tocbot-active-link',
+      listClass       : 'tocbot-list',
+      isCollapsedClass: 'tocbot-is-collapsed',
+      collapsibleClass: 'tocbot-is-collapsible',
+      scrollSmooth    : true,
+      includeTitleTags: true,
+      headingsOffset  : -boardTop,
+    }, CONFIG.toc));
+    if (toc.find('.toc-list-item').length > 0) {
+      toc.css('visibility', 'visible');
+    }
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('tocbot' in window) {
+        tocbot.refresh();
+        var toc = jQuery('#toc');
+        if (toc.length === 0 || !tocbot) {
+          return;
+        }
+        if (toc.find('.toc-list-item').length > 0) {
+          toc.css('visibility', 'visible');
+        }
+      }
+    });
+  });
+</script>
+
+
+  <script src=https://lib.baomitu.com/clipboard.js/2.0.11/clipboard.min.js></script>
+
+  <script>Fluid.plugins.codeWidget();</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/anchor-js/5.0.0/anchor.min.js', function() {
+    window.anchors.options = {
+      placement: CONFIG.anchorjs.placement,
+      visible  : CONFIG.anchorjs.visible
+    };
+    if (CONFIG.anchorjs.icon) {
+      window.anchors.options.icon = CONFIG.anchorjs.icon;
+    }
+    var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+    var res = [];
+    for (var item of el) {
+      res.push('.markdown-body > ' + item.trim());
+    }
+    if (CONFIG.anchorjs.placement === 'left') {
+      window.anchors.options.class = 'anchorjs-link-left';
+    }
+    window.anchors.add(res.join(', '));
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('anchors' in window) {
+        anchors.removeAll();
+        var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+        var res = [];
+        for (var item of el) {
+          res.push('.markdown-body > ' + item.trim());
+        }
+        if (CONFIG.anchorjs.placement === 'left') {
+          anchors.options.class = 'anchorjs-link-left';
+        }
+        anchors.add(res.join(', '));
+      }
+    });
+  });
+</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.js', function() {
+    Fluid.plugins.fancyBox();
+  });
+</script>
+
+
+  <script>Fluid.plugins.imageCaption();</script>
+
+  <script  src="/js/local-search.js" ></script>
+
+
+
+
+
+<!-- 主题的启动项，将它保持在最底部 -->
+<!-- the boot of the theme, keep it at the bottom -->
+<script  src="/js/boot.js" ></script>
+
+
+  
+
+  <noscript>
+    <div class="noscript-warning">博客在允许 JavaScript 运行的环境下浏览效果更佳</div>
+  </noscript>
+</body>
+</html>
