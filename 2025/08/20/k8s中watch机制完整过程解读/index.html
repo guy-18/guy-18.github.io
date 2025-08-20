@@ -26,10 +26,15 @@
 <meta property="og:site_name" content="John的博客">
 <meta property="og:description" content="k8s中watch机制完整过程解读问题一：k8s使用etcd的watch机制来监听资源的状态，我感觉这很神奇，k8s系统中具体是怎么watch到资源的“增删改”事件的，又是如何处理这些增删改事件的，如果短时间内watch到了一个资源对象的多个事件，又是如何处理的 非常好、非常核心的问题！你触及了Kubernetes控制器模式（Controller Pattern）的心脏。这个“Watch -&amp;gt">
 <meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://guy-18.github.io/2025/08/20/k8s%E4%B8%ADwatch%E6%9C%BA%E5%88%B6%E5%AE%8C%E6%95%B4%E8%BF%87%E7%A8%8B%E8%A7%A3%E8%AF%BB/deepseek_mermaid_20250820_a9b99c.svg">
+<meta property="og:image" content="http://guy-18.github.io/2025/08/20/k8s%E4%B8%ADwatch%E6%9C%BA%E5%88%B6%E5%AE%8C%E6%95%B4%E8%BF%87%E7%A8%8B%E8%A7%A3%E8%AF%BB/deepseek_mermaid_20250820_89ee99.svg">
+<meta property="og:image" content="http://guy-18.github.io/2025/08/20/k8s%E4%B8%ADwatch%E6%9C%BA%E5%88%B6%E5%AE%8C%E6%95%B4%E8%BF%87%E7%A8%8B%E8%A7%A3%E8%AF%BB/deepseek_mermaid_20250820_bd5d0d.svg">
+<meta property="og:image" content="http://guy-18.github.io/2025/08/20/k8s%E4%B8%ADwatch%E6%9C%BA%E5%88%B6%E5%AE%8C%E6%95%B4%E8%BF%87%E7%A8%8B%E8%A7%A3%E8%AF%BB/deepseek_mermaid_20250820_5e94c2.svg">
 <meta property="article:published_time" content="2025-08-19T19:36:47.000Z">
-<meta property="article:modified_time" content="2025-08-19T20:17:20.019Z">
+<meta property="article:modified_time" content="2025-08-20T08:01:42.274Z">
 <meta property="article:author" content="John">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="http://guy-18.github.io/2025/08/20/k8s%E4%B8%ADwatch%E6%9C%BA%E5%88%B6%E5%AE%8C%E6%95%B4%E8%BF%87%E7%A8%8B%E8%A7%A3%E8%AF%BB/deepseek_mermaid_20250820_a9b99c.svg">
   
   
   
@@ -222,7 +227,7 @@
       <span class="post-meta mr-2">
         <i class="iconfont icon-chart"></i>
         
-          5.3k 字
+          4.6k 字
         
       </span>
     
@@ -233,7 +238,7 @@
         
         
         
-          45 分钟
+          39 分钟
         
       </span>
     
@@ -280,25 +285,7 @@
 <p>我会为你详细拆解这个过程，从事件如何产生，到如何被处理，再到如何处理高频事件。</p>
 <hr>
 <p>为了让整个流程一目了然，下图概括了从事件发生到被处理的完整生命周期：</p>
-<pre><code class=" mermaid">flowchart TD
-A[用户/控制器 变更资源&lt;br&gt;（kubectl apply/delete）] --&gt; B[kube-apiserver&lt;br&gt;1. 变更Etcd数据&lt;br&gt;2. 生成通知事件]
-
-subgraph C [Watch机制核心]
-    direction LR
-    B -- 事件通知 --&gt; D[WatchCache&lt;br&gt;缓存近期事件&lt;br&gt;并通过HTTP流发送]
-end
-
-D -- 持续推送事件 --&gt; E[控制器（Controller）&lt;br&gt;1. 监听特定资源&lt;br&gt;2. 将事件加入队列]
-
-subgraph F [事件处理与调谐]
-    direction TB
-    E --&gt; G[工作队列（WorkQueue）&lt;br&gt;先进先出 + 去重]
-    G -- 取出下一个Key --&gt; H[控制循环（Control Loop）&lt;br&gt;1. 从API Server获取最新状态&lt;br&gt;2. 比较 当前状态 vs 期望状态&lt;br&gt;3. 执行操作（调谐）]
-end
-
-H --&gt; I[集群状态达到期望]
-</code></pre>
-
+<p><img src="/2025/08/20/k8s%E4%B8%ADwatch%E6%9C%BA%E5%88%B6%E5%AE%8C%E6%95%B4%E8%BF%87%E7%A8%8B%E8%A7%A3%E8%AF%BB/deepseek_mermaid_20250820_a9b99c.svg" srcset="/img/loading.gif" lazyload alt="deepseek_mermaid_20250820_a9b99c"></p>
 <p>接下来，我们详细解析图中的每一个关键环节。</p>
 <hr>
 <h2 id="1-事件的产生与传递：从-etcd-到-Watch"><a href="#1-事件的产生与传递：从-etcd-到-Watch" class="headerlink" title="1. 事件的产生与传递：从 etcd 到 Watch"></a>1. 事件的产生与传递：从 <code>etcd</code> 到 <code>Watch</code></h2><p>整个流程的起点，是一个资源对象（比如一个Pod）发生了变化。</p>
@@ -334,15 +321,7 @@ H --&gt; I[集群状态达到期望]
 </ol>
 <p><strong>为什么要有队列？</strong><br>这是为了<strong>解耦</strong>事件的接收和处理，同时也是处理“短时间内多个事件”的关键，我们会在第三部分详细展开。</p>
 <h3 id="2-2-处理（Process）：调谐循环（Reconcile-Loop）"><a href="#2-2-处理（Process）：调谐循环（Reconcile-Loop）" class="headerlink" title="2.2 处理（Process）：调谐循环（Reconcile Loop）"></a>2.2 处理（Process）：调谐循环（Reconcile Loop）</h3><p>控制器的核心是一个永不停止的循环，这个循环的工作流程如下图所示，它从队列中取出任务，并驱动物理集群的状态向期望状态收敛：</p>
-<pre><code class=" mermaid">flowchart LR
-    A[循环工作流程] --&gt; B[从工作队列取出Key]
-    B --&gt; C[从APIServer获取&lt;br&gt;该对象的当前状态]
-    C --&gt; D&#123;&quot;比较&lt;br&gt;当前状态 vs 期望状态&quot;&#125;
-    D -- 一致 --&gt; B
-    D -- 不一致 --&gt; E[执行操作&lt;br&gt;（创建/删除/更新Pod等）]
-    E -- 操作可能失败&lt;br&gt;Key会被重新入队 --&gt; B
-</code></pre>
-
+<p><img src="/2025/08/20/k8s%E4%B8%ADwatch%E6%9C%BA%E5%88%B6%E5%AE%8C%E6%95%B4%E8%BF%87%E7%A8%8B%E8%A7%A3%E8%AF%BB/deepseek_mermaid_20250820_89ee99.svg" srcset="/img/loading.gif" lazyload alt="deepseek_mermaid_20250820_89ee99"></p>
 <p>这个设计模式极其强大和鲁棒：</p>
 <ul>
 <li><strong>自我修复</strong>: 即使某个处理失败了，Key 会被重新放回队列，之后会再次尝试。</li>
@@ -427,45 +406,7 @@ H --&gt; I[集群状态达到期望]
 </ul>
 <h3 id="2-kube-apiserver-与-etcd-的交互：不止一次"><a href="#2-kube-apiserver-与-etcd-的交互：不止一次" class="headerlink" title="2. kube-apiserver 与 etcd 的交互：不止一次"></a>2. <code>kube-apiserver</code> 与 <code>etcd</code> 的交互：不止一次</h3><p><strong><code>kube-apiserver</code> 与 <code>etcd</code> 的交互比“只查询一次”要更频繁和智能。</strong></p>
 <p>你的理解——“建立Watch连接后查一次所有对象”——是100%正确的起点，但为了处理连接中断等情况，过程会更复杂一些。下图描绘了建立一个完整Watch连接的详细工作流程：</p>
-<pre><code class=" mermaid">sequenceDiagram
-    participant C as Controller
-    participant A as kube-apiserver
-    participant E as etcd
-    participant W as WatchCache
-
-    Note over C, A: 1. 发起Watch请求
-    C-&gt;&gt;A: GET /api/v1/watch/pods?labelSelector=...
-    Note right of C: 携带resourceVersion参数&lt;br&gt;（可选，用于指定起始点）
-
-    Note over A, E: 2. 建立与etcd的Watch连接
-    A-&gt;&gt;E: 建立gRPC Watch流
-    Note right of A: apiserver作为etcd的客户端
-
-    Note over A, W: 3. 构建内存缓存（WatchCache）
-    A-&gt;&gt;W: 查询或初始化缓存
-    Note right of W: WatchCache是apiserver内存中的&lt;br&gt;一个环形缓冲区，保存了近期事件
-
-    Note over A, E: 4. 获取历史事件（如有必要）
-    alt 如果请求指定了resourceVersion且在WatchCache范围内
-        A-&gt;&gt;W: 直接从缓存中获取历史事件流
-    else 如果请求的resourceVersion太老（已出缓存）
-        A-&gt;&gt;E: 发起一次范围查询（List）
-        E--&gt;&gt;A: 返回指定版本后的所有对象状态
-        A-&gt;&gt;W: 将查询结果转换为ADDED事件
-    end
-
-    loop 5. 持续流式推送
-        A--&gt;&gt;C: 推送历史/缓存事件 (ADDED)
-        par 实时事件推送
-            E--&gt;&gt;A: 推送etcd的变更事件
-            A-&gt;&gt;W: 更新WatchCache
-            A--&gt;&gt;C: 转发事件 (ADDED/MODIFIED/DELETED)
-        and 心跳保持
-            A--&gt;&gt;C: 定期发送空报文保持连接
-        end
-    end
-</code></pre>
-
+<p><img src="/2025/08/20/k8s%E4%B8%ADwatch%E6%9C%BA%E5%88%B6%E5%AE%8C%E6%95%B4%E8%BF%87%E7%A8%8B%E8%A7%A3%E8%AF%BB/deepseek_mermaid_20250820_bd5d0d.svg" srcset="/img/loading.gif" lazyload alt="deepseek_mermaid_20250820_bd5d0d"></p>
 <p><strong>关键点解析：</strong></p>
 <ul>
 <li>**<code>kube-apiserver</code> 的内存缓存 (<code>WatchCache</code>)**：为了避免频繁查询 <code>etcd</code>，<code>kube-apiserver</code> 在内存中维护了一个名为 <strong><code>WatchCache</code></strong> 的缓存。它缓存了所有资源的最近历史事件（可配置缓存大小）。这极大地优化了性能。</li>
@@ -508,38 +449,7 @@ H --&gt; I[集群状态达到期望]
 </ul>
 <p>如果实例B和C不知道这次变更，那么当有客户端（比如一个控制器）连接到实例B并请求数据时，实例B返回的就是<strong>过时的、错误的数据</strong>。这是绝对不允许的。</p>
 <p><strong>解决方案就是：</strong> 所有的 <code>kube-apiserver</code> 实例（A, B, C）都<strong>作为客户端</strong>，与 <code>etcd</code> 集群建立 <strong>Watch 连接</strong>。这样，无论哪个实例写入的数据，都会通过 <code>etcd</code> 的 Watch 机制<strong>实时地、可靠地</strong>广播给所有其他的 <code>kube-apiserver</code> 实例。</p>
-<pre><code class=" mermaid">flowchart TD
-    U[用户/控制器请求&lt;br&gt;通过负载均衡器]
-    U --&gt; A[kube-apiserver&lt;br&gt;实例A]
-    U --&gt; B[kube-apiserver&lt;br&gt;实例B]
-    U --&gt; C[kube-apiserver&lt;br&gt;实例C]
-
-    subgraph E [etcd集群]
-        E1[etcd节点1]
-        E2[etcd节点2]
-        E3[etcd节点3]
-    end
-
-    A -- 写入 --&gt; E
-    B -- Watch连接 --&gt; E
-    C -- Watch连接 --&gt; E
-
-    E -- “实例A写入了对象X” --&gt; B
-    E -- “实例A写入了对象X” --&gt; C
-
-    subgraph Cache[apiserver内存状态]
-        A_C[实例A缓存&lt;br&gt;已更新]
-        B_C[实例B缓存&lt;br&gt;通过Watch更新]
-        C_C[实例C缓存&lt;br&gt;通过Watch更新]
-    end
-
-    A -- 更新 --&gt; A_C
-    E -- 通知 --&gt; B
-    E -- 通知 --&gt; C
-    B -- 更新 --&gt; B_C
-    C -- 更新 --&gt; C_C
-</code></pre>
-
+<p><img src="/2025/08/20/k8s%E4%B8%ADwatch%E6%9C%BA%E5%88%B6%E5%AE%8C%E6%95%B4%E8%BF%87%E7%A8%8B%E8%A7%A3%E8%AF%BB/deepseek_mermaid_20250820_5e94c2.svg" srcset="/img/loading.gif" lazyload alt="deepseek_mermaid_20250820_5e94c2"></p>
 <h3 id="2-写入者会收到自己写入的事件吗？"><a href="#2-写入者会收到自己写入的事件吗？" class="headerlink" title="2. 写入者会收到自己写入的事件吗？"></a>2. 写入者会收到自己写入的事件吗？</h3><p><strong>会的！</strong> 这是一个非常重要的点。</p>
 <p>当 <code>kube-apiserver</code> 实例A向 <code>etcd</code> 写入一个变更后，<code>etcd</code> 会将这个变更事件<strong>通知给所有监听了相关键的客户端</strong>。这<strong>包括</strong>了实例A自己。</p>
 <p>这看起来像是“重复通知”，但这是保证逻辑正确的必要代价。其好处是：</p>
