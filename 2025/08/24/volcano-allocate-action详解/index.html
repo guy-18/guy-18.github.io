@@ -1,0 +1,678 @@
+
+
+<!DOCTYPE html>
+<html lang="zh-CN" data-default-color-scheme=auto>
+
+
+
+<head>
+  <meta charset="UTF-8">
+
+  <link rel="apple-touch-icon" sizes="76x76" href="/img/fluid.png">
+  <link rel="icon" href="/img/fluid.png">
+  
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, shrink-to-fit=no">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  
+  <meta name="theme-color" content="#2f4154">
+  <meta name="author" content="John">
+  <meta name="keywords" content="">
+  
+    <meta name="description" content="Volcano 调度器中的 Allocate Action 是调度流程的核心环节，它负责为已经入队（Inqueue）的 Pod 分配具体的节点。这个过程非常精密，涉及到预选、优选、资源预留和最终的绑定决策。 下面我将结合 Volcano 的最新源码（主要参考 v1.12.0 版本），为你详细解析 Allocate Action 的具体过程。 🔧 Allocate Action 的核心作用Allo">
+<meta property="og:type" content="article">
+<meta property="og:title" content="volcano-allocate-action详解">
+<meta property="og:url" content="http://guy-18.github.io/2025/08/24/volcano-allocate-action%E8%AF%A6%E8%A7%A3/index.html">
+<meta property="og:site_name" content="John的博客">
+<meta property="og:description" content="Volcano 调度器中的 Allocate Action 是调度流程的核心环节，它负责为已经入队（Inqueue）的 Pod 分配具体的节点。这个过程非常精密，涉及到预选、优选、资源预留和最终的绑定决策。 下面我将结合 Volcano 的最新源码（主要参考 v1.12.0 版本），为你详细解析 Allocate Action 的具体过程。 🔧 Allocate Action 的核心作用Allo">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://guy-18.github.io/2025/08/24/volcano-allocate-action%E8%AF%A6%E8%A7%A3/deepseek_mermaid_20250823_5e5c2b.png">
+<meta property="article:published_time" content="2025-08-23T17:41:49.000Z">
+<meta property="article:modified_time" content="2025-08-23T17:44:05.970Z">
+<meta property="article:author" content="John">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="http://guy-18.github.io/2025/08/24/volcano-allocate-action%E8%AF%A6%E8%A7%A3/deepseek_mermaid_20250823_5e5c2b.png">
+  
+  
+  
+  <title>volcano-allocate-action详解 - John的博客</title>
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/twitter-bootstrap/4.6.1/css/bootstrap.min.css" />
+
+
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/github-markdown-css/4.0.0/github-markdown.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/hint.css/2.7.0/hint.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.css" />
+
+
+
+<!-- 主题依赖的图标库，不要自行修改 -->
+<!-- Do not modify the link that theme dependent icons -->
+
+<link rel="stylesheet" href="//at.alicdn.com/t/c/font_1749284_5i9bdhy70f8.css">
+
+
+
+<link rel="stylesheet" href="//at.alicdn.com/t/c/font_1736178_k526ubmyhba.css">
+
+
+<link  rel="stylesheet" href="/css/main.css" />
+
+
+  <link id="highlight-css" rel="stylesheet" href="/css/highlight.css" />
+  
+    <link id="highlight-css-dark" rel="stylesheet" href="/css/highlight-dark.css" />
+  
+
+
+
+
+  <script id="fluid-configs">
+    var Fluid = window.Fluid || {};
+    Fluid.ctx = Object.assign({}, Fluid.ctx)
+    var CONFIG = {"hostname":"guy-18.github.io","root":"/","version":"1.9.8","typing":{"enable":true,"typeSpeed":70,"cursorChar":"_","loop":false,"scope":[]},"anchorjs":{"enable":true,"element":"h1,h2,h3,h4,h5,h6","placement":"left","visible":"hover","icon":""},"progressbar":{"enable":true,"height_px":3,"color":"#29d","options":{"showSpinner":false,"trickleSpeed":100}},"code_language":{"enable":true,"default":"TEXT"},"copy_btn":true,"image_caption":{"enable":true},"image_zoom":{"enable":true,"img_url_replace":["",""]},"toc":{"enable":true,"placement":"right","headingSelector":"h1,h2,h3,h4,h5,h6","collapseDepth":0},"lazyload":{"enable":true,"loading_img":"/img/loading.gif","onlypost":false,"offset_factor":2},"web_analytics":{"enable":false,"follow_dnt":true,"baidu":null,"google":{"measurement_id":null},"tencent":{"sid":null,"cid":null},"leancloud":{"app_id":null,"app_key":null,"server_url":null,"path":"window.location.pathname","ignore_local":false},"umami":{"src":null,"website_id":null,"domains":null,"start_time":"2024-01-01T00:00:00.000Z","token":null,"api_server":null}},"search_path":"/local-search.xml","include_content_in_search":true};
+
+    if (CONFIG.web_analytics.follow_dnt) {
+      var dntVal = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+      Fluid.ctx.dnt = dntVal && (dntVal.startsWith('1') || dntVal.startsWith('yes') || dntVal.startsWith('on'));
+    }
+  </script>
+  <script  src="/js/utils.js" ></script>
+  <script  src="/js/color-schema.js" ></script>
+  
+
+
+  
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+
+<body>
+  
+
+  <header>
+    
+
+<div class="header-inner" style="height: 70vh;">
+  <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
+  <div class="container">
+    <a class="navbar-brand" href="/">
+      <strong>Fluid</strong>
+    </a>
+
+    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
+            data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <div class="animated-icon"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Collapsible content -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ml-auto text-center">
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/" target="_self">
+                <i class="iconfont icon-home-fill"></i>
+                <span>首页</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/archives/" target="_self">
+                <i class="iconfont icon-archive-fill"></i>
+                <span>归档</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/categories/" target="_self">
+                <i class="iconfont icon-category-fill"></i>
+                <span>分类</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/tags/" target="_self">
+                <i class="iconfont icon-tags-fill"></i>
+                <span>标签</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/about/" target="_self">
+                <i class="iconfont icon-user-fill"></i>
+                <span>关于</span>
+              </a>
+            </li>
+          
+        
+        
+          <li class="nav-item" id="search-btn">
+            <a class="nav-link" target="_self" href="javascript:;" data-toggle="modal" data-target="#modalSearch" aria-label="Search">
+              <i class="iconfont icon-search"></i>
+            </a>
+          </li>
+          
+        
+        
+          <li class="nav-item" id="color-toggle-btn">
+            <a class="nav-link" target="_self" href="javascript:;" aria-label="Color Toggle">
+              <i class="iconfont icon-dark" id="color-toggle-icon"></i>
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+  
+
+<div id="banner" class="banner" parallax=true
+     style="background: url('/img/default.png') no-repeat center center; background-size: cover;">
+  <div class="full-bg-img">
+    <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
+      <div class="banner-text text-center fade-in-up">
+        <div class="h2">
+          
+            <span id="subtitle" data-typed-text="volcano-allocate-action详解"></span>
+          
+        </div>
+
+        
+          
+  <div class="mt-3">
+    
+    
+      <span class="post-meta">
+        <i class="iconfont icon-date-fill" aria-hidden="true"></i>
+        <time datetime="2025-08-24 01:41" pubdate>
+          2025年8月24日 凌晨
+        </time>
+      </span>
+    
+  </div>
+
+  <div class="mt-1">
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-chart"></i>
+        
+          1.6k 字
+        
+      </span>
+    
+
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-clock-fill"></i>
+        
+        
+        
+          14 分钟
+        
+      </span>
+    
+
+    
+    
+  </div>
+
+
+        
+      </div>
+
+      
+    </div>
+  </div>
+</div>
+
+</div>
+
+  </header>
+
+  <main>
+    
+      
+
+<div class="container-fluid nopadding-x">
+  <div class="row nomargin-x">
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+
+    </div>
+
+    <div class="col-lg-8 nopadding-x-md">
+      <div class="container nopadding-x-md" id="board-ctn">
+        <div id="board">
+          <article class="post-content mx-auto">
+            <h1 id="seo-header">volcano-allocate-action详解</h1>
+            
+            
+              <div class="markdown-body">
+                
+                <p>Volcano 调度器中的 <strong>Allocate Action</strong> 是调度流程的核心环节，它负责为已经入队（Inqueue）的 Pod 分配具体的节点。这个过程非常精密，涉及到预选、优选、资源预留和最终的绑定决策。</p>
+<p>下面我将结合 Volcano 的最新源码（主要参考 <code>v1.12.0</code> 版本），为你详细解析 Allocate Action 的具体过程。</p>
+<h3 id="🔧-Allocate-Action-的核心作用"><a href="#🔧-Allocate-Action-的核心作用" class="headerlink" title="🔧 Allocate Action 的核心作用"></a>🔧 Allocate Action 的核心作用</h3><p>Allocate Action 的核心任务是<strong>为每个已入队的 Pod 尝试分配一个合适的节点</strong>。它不仅会检查节点资源的充足性，还要确保满足作业级别的约束（如 Gang 调度策略），并在最终一次性提交所有绑定决策。</p>
+<h3 id="📦-关键数据结构"><a href="#📦-关键数据结构" class="headerlink" title="📦 关键数据结构"></a>📦 关键数据结构</h3><p>在深入流程之前，了解几个关键的数据结构有助于理解后续过程：</p>
+<ul>
+<li><strong><code>Session</code></strong>: 代表一个调度周期（Session）的上下文，包含了当前调度所需的所有信息，如待调度的 Job 列表 (<code>Jobs</code>)、集群节点信息 (<code>Nodes</code>)、已注册的插件 (<code>Plugins</code>) 等。Allocate Action 会操作这个 Session。</li>
+<li><strong><code>JobInfo</code></strong>: 并非直接对应 Volcano Job CRD，而是调度器内部对 <strong>PodGroup</strong> 及其所属 Pod 的封装。一个 <code>JobInfo</code> 包含了一个 PodGroup 下的所有 Pod（封装为 <code>TaskInfo</code>）。</li>
+<li><strong><code>TaskInfo</code></strong>: 调度器内部对 <strong>Pod</strong> 的封装。包含了 Pod 的详细信息以及其资源请求。</li>
+<li><strong><code>NodeInfo</code></strong>: 调度器内部对 <strong>Kubernetes Node</strong> 的封装。包含了节点的资源容量、已分配资源、支持的操作系统架构等信息。</li>
+</ul>
+<h3 id="🔍-Allocate-Action-详细工作流程"><a href="#🔍-Allocate-Action-详细工作流程" class="headerlink" title="🔍 Allocate Action 详细工作流程"></a>🔍 Allocate Action 详细工作流程</h3><p>Allocate Action 的入口点在 <code>pkg/scheduler/actions/allocate/allocate.go</code> 文件中的 <code>Execute</code> 函数。其工作流程可以概括为以下几个核心步骤：</p>
+<ol>
+<li><strong>准备待调度的任务</strong>：遍历当前 Session 中的所有 <code>JobInfo</code>，收集其中处于 <code>Pending</code> 状态的 <code>TaskInfo</code>（Pod）。这些任务就是本轮 Allocate Action 需要尝试调度的对象。</li>
+<li><strong>任务排序</strong>：根据配置的插件（如 <strong>Priority</strong> 插件），对这些待调度的 <code>TaskInfo</code> 进行排序。通常优先级高的任务会优先得到调度。</li>
+<li><strong>遍历任务，尝试分配</strong>：这是最核心的循环。对于每一个待调度的任务，执行以下子步骤：<ul>
+<li><strong>a. 预选 (Predicate)<strong>：调用 <strong>Predicates</strong> 插件，过滤掉所有不满足该 Pod 基本要求的节点。例如，检查节点的资源（CPU、内存、GPU）是否 &gt;&#x3D; Pod 的请求，检查节点Selector、亲和性&#x2F;反亲和性、污点容忍等。通过这一步，会得到一个</strong>候选节点列表</strong>。</li>
+<li><strong>b. 优选 (Prioritize&#x2F;Node Ordering)<strong>：如果预选后还有多个候选节点，则会调用 <strong>NodeOrder</strong> 等插件为这些节点打分。插件会考虑多种因素，如资源平衡（Binpack 或 Spread）、节点亲和性、镜像是否已存在等，最终选出一个</strong>最优节点</strong>。</li>
+<li><strong>c. 资源预留 (Reservation)<strong>：并不是立即调用 Kubernetes API 进行绑定，而是在当前 Session 的缓存中，</strong>模拟</strong>从选出的最优节点上扣除该 Pod 所请求的资源。这一步确保了后续的调度决策是基于最新的资源视图，避免了重复分配。</li>
+<li><strong>d. 生成分配指令</strong>：将 <code>(TaskInfo, NodeInfo)</code> 这个分配决策记录下来，存储在 Session 中，等待后续提交。</li>
+</ul>
+</li>
+<li><strong>提交分配决策 (Commit)<strong>：在所有合适的任务都经过上述流程后，Allocate Action 会</strong>一次性提交</strong>本周期内所有的分配决策。调度器会将这些绑定信息（Pod 和 Node 的对应关系）通过 Kubernetes API Server 进行更新（设置 Pod 的 <code>nodeName</code> 字段）。</li>
+</ol>
+<p><img src="/2025/08/24/volcano-allocate-action%E8%AF%A6%E8%A7%A3/deepseek_mermaid_20250823_5e5c2b.png" srcset="/img/loading.gif" lazyload alt="deepseek_mermaid_20250823_5e5c2b"></p>
+<h3 id="⚙️-依赖的关键插件"><a href="#⚙️-依赖的关键插件" class="headerlink" title="⚙️ 依赖的关键插件"></a>⚙️ 依赖的关键插件</h3><p>Allocate Action 本身是一个框架，其具体行为由一系列插件决定：</p>
+<ul>
+<li><strong>Gang 插件</strong>: 这是 <strong>“All or Nothing” 策略的强制执行者</strong>。即使一个 Pod 通过了预选和优选，Gang 插件也会检查其所属的整个 <code>JobInfo</code> (PodGroup) 是否满足 <code>minAvailable</code> 条件。<strong>只有在满足 <code>minAvailable</code> 时，本次会话中为该 Job 所做的所有分配才会被提交；否则，所有分配都会被回滚</strong>，该 Job 的 Pod 不会绑定到任何节点。<strong>Gang检查是在遍历完所有的pod之后</strong>。</li>
+<li><strong>Predicates 插件</strong>: 负责<strong>预选</strong>，实现节点过滤的逻辑。它检查 Pod 是否适合调度到某个节点上。</li>
+<li><strong>NodeOrder 插件</strong>: 负责<strong>优选</strong>，实现节点打分的逻辑。它为每个候选节点计算一个分数，调度器选择分数最高的节点。</li>
+<li><strong>Binpack 插件</strong>: 通常与 NodeOrder 插件协同工作，倾向于将资源分配集中在尽可能少的节点上，以提高节点利用率，便于后续腾空节点。</li>
+<li><strong>Priority 插件</strong>: 用于在多个待调度的 Task(Pod) 之间进行优先级排序，决定哪个 Pod 优先进行分配。</li>
+</ul>
+<h3 id="🧪-结合示例说明"><a href="#🧪-结合示例说明" class="headerlink" title="🧪 结合示例说明"></a>🧪 结合示例说明</h3><p>假设我们有一个包含 1 个 <code>ps</code> 和 2 个 <code>worker</code> 的 TensorFlow 作业（PodGroup，<code>minAvailable=3</code>），并且已通过 Enqueue Action 检查，Pod 已被创建。</p>
+<ol>
+<li><strong>Allocate Action 开始</strong>：调度器收集这 3 个处于 Pending 状态的 Pod。</li>
+<li><strong>任务排序</strong>：假设优先级相同，则按创建时间等顺序处理。</li>
+<li><strong>为 <code>ps</code> Pod 分配</strong>：<ul>
+<li><strong>Predicate</strong>：过滤出所有满足 <code>ps</code> 资源请求（例如 1 CPU, 2GiB Mem）的节点。</li>
+<li><strong>NodeOrder</strong>：对候选节点打分（例如，选择资源碎片最少的节点 <code>node-a</code>）。</li>
+<li><strong>预留</strong>：在 Session 中标记 <code>node-a</code> 的 1 CPU 和 2GiB Mem 被预留。</li>
+</ul>
+</li>
+<li><strong>为 <code>worker-1</code> Pod 分配</strong>：<ul>
+<li><strong>Predicate</strong>：过滤节点（现在 <code>node-a</code> 可用资源减少了）。</li>
+<li><strong>NodeOrder</strong>：选出最优节点 <code>node-b</code>。</li>
+<li><strong>预留</strong>：预留 <code>node-b</code> 上 2 CPU 和 4GiB Mem。</li>
+</ul>
+</li>
+<li><strong>为 <code>worker-2</code> Pod 分配</strong>：<ul>
+<li><strong>Predicate</strong>：过滤节点。</li>
+<li><strong>NodeOrder</strong>：选出最优节点 <code>node-c</code>。</li>
+<li><strong>预留</strong>：预留 <code>node-c</code> 上 2 CPU 和 4GiB Mem。</li>
+</ul>
+</li>
+<li><strong>Gang 插件检查</strong>：调度器检查到该 Job 的 3 个 Pod 都已成功分配节点，满足 <code>minAvailable=3</code> 的条件。</li>
+<li><strong>提交</strong>：调度器通过 API Server 将这 3 个 Pod 分别绑定到 <code>node-a</code>, <code>node-b</code>, <code>node-c</code>。</li>
+</ol>
+<p>如果集群资源只够运行 2 个 <code>worker</code>，不够运行 <code>ps</code>，那么 Gang 插件会检查失败，导致<strong>所有 3 个 Pod 的分配都会被撤销</strong>，等待下一个调度周期再尝试。这就有效防止了分布式任务因部分进程无法启动而造成的死锁。</p>
+<h3 id="⚠️-注意事项"><a href="#⚠️-注意事项" class="headerlink" title="⚠️ 注意事项"></a>⚠️ 注意事项</h3><ol>
+<li><strong>执行顺序</strong>：在 <code>volcano-scheduler-configmap</code> 中，<code>allocate</code> 通常放置在 <code>enqueue</code> 之后，<code>backfill</code> 之前。Action 的执行顺序很重要。</li>
+<li><strong>插件配置</strong>：确保 <code>allocate</code> 所依赖的插件（如 <code>predicates</code>, <code>nodeorder</code>, <code>gang</code>）已在配置中正确启用并放置在合适的 tier 中。</li>
+<li><strong>与 Preempt&#x2F;Reclaim 的区别</strong>：<code>Allocate</code> 是正常分配，而 <code>Preempt</code> 是同一队列内基于优先级的抢占，<code>Reclaim</code> 是跨队列的资源回收。它们解决的是不同层面的资源分配问题。</li>
+</ol>
+<p>希望这份结合源码的详细解读，能帮助你透彻地理解 Volcano Allocate Action 的工作机制。</p>
+
+                
+              </div>
+            
+            <hr/>
+            <div>
+              <div class="post-metas my-3">
+  
+  
+</div>
+
+
+              
+  
+
+  <div class="license-box my-3">
+    <div class="license-title">
+      <div>volcano-allocate-action详解</div>
+      <div>http://guy-18.github.io/2025/08/24/volcano-allocate-action详解/</div>
+    </div>
+    <div class="license-meta">
+      
+        <div class="license-meta-item">
+          <div>作者</div>
+          <div>John</div>
+        </div>
+      
+      
+        <div class="license-meta-item license-meta-date">
+          <div>发布于</div>
+          <div>2025年8月24日</div>
+        </div>
+      
+      
+      
+        <div class="license-meta-item">
+          <div>许可协议</div>
+          <div>
+            
+              
+              
+                <a class="print-no-link" target="_blank" href="https://creativecommons.org/licenses/by/4.0/">
+                  <span class="hint--top hint--rounded" aria-label="BY - 署名">
+                    <i class="iconfont icon-cc-by"></i>
+                  </span>
+                </a>
+              
+            
+          </div>
+        </div>
+      
+    </div>
+    <div class="license-icon iconfont"></div>
+  </div>
+
+
+
+              
+                <div class="post-prevnext my-3">
+                  <article class="post-prev col-6">
+                    
+                    
+                  </article>
+                  <article class="post-next col-6">
+                    
+                    
+                      <a href="/2025/08/20/k8s%E4%B8%ADwatch%E6%9C%BA%E5%88%B6%E5%AE%8C%E6%95%B4%E8%BF%87%E7%A8%8B%E8%A7%A3%E8%AF%BB/" title="k8s中watch机制完整过程解读">
+                        <span class="hidden-mobile">k8s中watch机制完整过程解读</span>
+                        <span class="visible-mobile">下一篇</span>
+                        <i class="iconfont icon-arrowright"></i>
+                      </a>
+                    
+                  </article>
+                </div>
+              
+            </div>
+
+            
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+  <aside class="sidebar" style="margin-left: -1rem">
+    <div id="toc">
+  <p class="toc-header">
+    <i class="iconfont icon-list"></i>
+    <span>目录</span>
+  </p>
+  <div class="toc-body" id="toc-body"></div>
+</div>
+
+
+
+  </aside>
+
+
+    </div>
+  </div>
+</div>
+
+
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+
+
+
+
+    
+
+    
+      <a id="scroll-top-button" aria-label="TOP" href="#" role="button">
+        <i class="iconfont icon-arrowup" aria-hidden="true"></i>
+      </a>
+    
+
+    
+      <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header text-center">
+        <h4 class="modal-title w-100 font-weight-bold">搜索</h4>
+        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body mx-3">
+        <div class="md-form mb-5">
+          <input type="text" id="local-search-input" class="form-control validate">
+          <label data-error="x" data-success="v" for="local-search-input">关键词</label>
+        </div>
+        <div class="list-group" id="local-search-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+    
+
+    
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+  
+    <div class="footer-content">
+       <a href="https://hexo.io" target="_blank" rel="nofollow noopener"><span>Hexo</span></a> <i class="iconfont icon-love"></i> <a href="https://github.com/fluid-dev/hexo-theme-fluid" target="_blank" rel="nofollow noopener"><span>Fluid</span></a> 
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+
+  <!-- Scripts -->
+  
+  <script  src="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.js" ></script>
+  <link  rel="stylesheet" href="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.css" />
+
+  <script>
+    NProgress.configure({"showSpinner":false,"trickleSpeed":100})
+    NProgress.start()
+    window.addEventListener('load', function() {
+      NProgress.done();
+    })
+  </script>
+
+
+<script  src="https://lib.baomitu.com/jquery/3.6.4/jquery.min.js" ></script>
+<script  src="https://lib.baomitu.com/twitter-bootstrap/4.6.1/js/bootstrap.min.js" ></script>
+<script  src="/js/events.js" ></script>
+<script  src="/js/plugins.js" ></script>
+
+
+  <script  src="https://lib.baomitu.com/typed.js/2.0.12/typed.min.js" ></script>
+  <script>
+    (function (window, document) {
+      var typing = Fluid.plugins.typing;
+      var subtitle = document.getElementById('subtitle');
+      if (!subtitle || !typing) {
+        return;
+      }
+      var text = subtitle.getAttribute('data-typed-text');
+      
+        typing(text);
+      
+    })(window, document);
+  </script>
+
+
+
+
+  
+    <script  src="/js/img-lazyload.js" ></script>
+  
+
+
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/tocbot/4.20.1/tocbot.min.js', function() {
+    var toc = jQuery('#toc');
+    if (toc.length === 0 || !window.tocbot) { return; }
+    var boardCtn = jQuery('#board-ctn');
+    var boardTop = boardCtn.offset().top;
+
+    window.tocbot.init(Object.assign({
+      tocSelector     : '#toc-body',
+      contentSelector : '.markdown-body',
+      linkClass       : 'tocbot-link',
+      activeLinkClass : 'tocbot-active-link',
+      listClass       : 'tocbot-list',
+      isCollapsedClass: 'tocbot-is-collapsed',
+      collapsibleClass: 'tocbot-is-collapsible',
+      scrollSmooth    : true,
+      includeTitleTags: true,
+      headingsOffset  : -boardTop,
+    }, CONFIG.toc));
+    if (toc.find('.toc-list-item').length > 0) {
+      toc.css('visibility', 'visible');
+    }
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('tocbot' in window) {
+        tocbot.refresh();
+        var toc = jQuery('#toc');
+        if (toc.length === 0 || !tocbot) {
+          return;
+        }
+        if (toc.find('.toc-list-item').length > 0) {
+          toc.css('visibility', 'visible');
+        }
+      }
+    });
+  });
+</script>
+
+
+  <script src=https://lib.baomitu.com/clipboard.js/2.0.11/clipboard.min.js></script>
+
+  <script>Fluid.plugins.codeWidget();</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/anchor-js/5.0.0/anchor.min.js', function() {
+    window.anchors.options = {
+      placement: CONFIG.anchorjs.placement,
+      visible  : CONFIG.anchorjs.visible
+    };
+    if (CONFIG.anchorjs.icon) {
+      window.anchors.options.icon = CONFIG.anchorjs.icon;
+    }
+    var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+    var res = [];
+    for (var item of el) {
+      res.push('.markdown-body > ' + item.trim());
+    }
+    if (CONFIG.anchorjs.placement === 'left') {
+      window.anchors.options.class = 'anchorjs-link-left';
+    }
+    window.anchors.add(res.join(', '));
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('anchors' in window) {
+        anchors.removeAll();
+        var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+        var res = [];
+        for (var item of el) {
+          res.push('.markdown-body > ' + item.trim());
+        }
+        if (CONFIG.anchorjs.placement === 'left') {
+          anchors.options.class = 'anchorjs-link-left';
+        }
+        anchors.add(res.join(', '));
+      }
+    });
+  });
+</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.js', function() {
+    Fluid.plugins.fancyBox();
+  });
+</script>
+
+
+  <script>Fluid.plugins.imageCaption();</script>
+
+  <script  src="/js/local-search.js" ></script>
+
+
+
+
+
+<!-- 主题的启动项，将它保持在最底部 -->
+<!-- the boot of the theme, keep it at the bottom -->
+<script  src="/js/boot.js" ></script>
+
+
+  
+
+  <noscript>
+    <div class="noscript-warning">博客在允许 JavaScript 运行的环境下浏览效果更佳</div>
+  </noscript>
+</body>
+</html>
