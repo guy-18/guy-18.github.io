@@ -229,6 +229,39 @@
     <article class="col-12 col-md-12 mx-auto index-info">
       <h2 class="index-header">
         
+        <a href="/2025/07/25/k8s%E7%BD%91%E7%BB%9C%E9%9A%94%E7%A6%BB%E7%AD%96%E7%95%A5/" target="_self">
+          k8s网络隔离策略
+        </a>
+      </h2>
+
+      
+      <a class="index-excerpt index-excerpt__noimg" href="/2025/07/25/k8s%E7%BD%91%E7%BB%9C%E9%9A%94%E7%A6%BB%E7%AD%96%E7%95%A5/" target="_self">
+        <div>
+          k8s网络隔离策略在 Kubernetes 中，默认情况下，所有命名空间（Namespace）中的 Pod 可以通过网络直接互通，除非配置了 NetworkPolicy 显式限制流量。如果您的集群已经启用了网络插件（如 Calico、Cilium 等），并且需要 明确允许 ns-a 和 ns-b 互通，可以按以下步骤操作：  方法 1：允许特定命名空间之间的流量1. 创建 NetworkPolic
+        </div>
+      </a>
+
+      <div class="index-btm post-metas">
+        
+          <div class="post-meta mr-3">
+            <i class="iconfont icon-date"></i>
+            <time datetime="2025-07-25 21:20" pubdate>
+              2025-07-25
+            </time>
+          </div>
+        
+        
+        
+      </div>
+    </article>
+  </div>
+
+  <div class="row mx-auto index-card">
+    
+    
+    <article class="col-12 col-md-12 mx-auto index-info">
+      <h2 class="index-header">
+        
         <a href="/2025/07/25/list-watch%E5%9C%A8%E7%BD%91%E7%BB%9C%E4%B8%AD%E6%96%AD%E5%90%8E%E7%9A%84%E6%81%A2%E5%A4%8D%E6%9C%BA%E5%88%B6/" target="_self">
           list-watch在网络中断后的恢复机制
         </a>
@@ -520,44 +553,11 @@
     </article>
   </div>
 
-  <div class="row mx-auto index-card">
-    
-    
-    <article class="col-12 col-md-12 mx-auto index-info">
-      <h2 class="index-header">
-        
-        <a href="/2025/04/28/apply%E4%B9%8B%E5%90%8E%E7%9A%84%E6%B5%81%E7%A8%8B/" target="_self">
-          apply之后的流程
-        </a>
-      </h2>
-
-      
-      <a class="index-excerpt index-excerpt__noimg" href="/2025/04/28/apply%E4%B9%8B%E5%90%8E%E7%9A%84%E6%B5%81%E7%A8%8B/" target="_self">
-        <div>
-          kubectl apply -f xxxx.yaml之后的过程整个过程首先从kubectl发起，以kubelet生成相应的pod为结束。  kubectl 验证和生成器 API 版本协商与 API 组 发送http请求到apiserver   apiserver 客户端身份认证 授权 准入控制 数据反序列化，存入etcd   etcd 获得数据 同步数据 保存数据   controller-man
-        </div>
-      </a>
-
-      <div class="index-btm post-metas">
-        
-          <div class="post-meta mr-3">
-            <i class="iconfont icon-date"></i>
-            <time datetime="2025-04-28 20:57" pubdate>
-              2025-04-28
-            </time>
-          </div>
-        
-        
-        
-      </div>
-    </article>
-  </div>
-
 
 
   <nav aria-label="navigation">
     <span class="pagination" id="pagination">
-      <a class="extend prev" rel="prev" href="/"><i class="iconfont icon-arrowleft"></i></a><a class="page-number" href="/">1</a><span class="page-number current">2</span><a class="page-number" href="/page/3/#board">3</a><a class="page-number" href="/page/4/#board">4</a><a class="page-number" href="/page/5/#board">5</a><a class="extend next" rel="next" href="/page/3/#board"><i class="iconfont icon-arrowright"></i></a>
+      <a class="extend prev" rel="prev" href="/"><i class="iconfont icon-arrowleft"></i></a><a class="page-number" href="/">1</a><span class="page-number current">2</span><a class="page-number" href="/page/3/#board">3</a><a class="page-number" href="/page/4/#board">4</a><span class="space">&hellip;</span><a class="page-number" href="/page/6/#board">6</a><a class="extend next" rel="next" href="/page/3/#board"><i class="iconfont icon-arrowright"></i></a>
     </span>
   </nav>
 

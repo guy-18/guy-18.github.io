@@ -1,0 +1,834 @@
+
+
+<!DOCTYPE html>
+<html lang="zh-CN" data-default-color-scheme=auto>
+
+
+
+<head>
+  <meta charset="UTF-8">
+
+  <link rel="apple-touch-icon" sizes="76x76" href="/img/fluid.png">
+  <link rel="icon" href="/img/fluid.png">
+  
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, shrink-to-fit=no">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  
+  <meta name="theme-color" content="#2f4154">
+  <meta name="author" content="John">
+  <meta name="keywords" content="">
+  
+    <meta name="description" content="PVC、StorageClass、PV是什么你好！欢迎来到Kubernetes的世界！你遇到的这三个概念（PVC, PV, StorageClass）确实是存储部分的核心，也是很多初学者会感到困惑的地方。别担心，我用一个简单的比喻和详细的解释来帮你彻底搞懂它们。 一个生动的比喻：租房想象一下你要租房子：  PVC (PersistentVolumeClaim) - 你的“租房需求”  你告诉中介：">
+<meta property="og:type" content="article">
+<meta property="og:title" content="John的博客">
+<meta property="og:url" content="http://guy-18.github.io/2025/08/22/PVC-StorageClass-PV%E5%8E%9F%E7%90%86%E8%A7%A3%E8%AF%BB/index.html">
+<meta property="og:site_name" content="John的博客">
+<meta property="og:description" content="PVC、StorageClass、PV是什么你好！欢迎来到Kubernetes的世界！你遇到的这三个概念（PVC, PV, StorageClass）确实是存储部分的核心，也是很多初学者会感到困惑的地方。别担心，我用一个简单的比喻和详细的解释来帮你彻底搞懂它们。 一个生动的比喻：租房想象一下你要租房子：  PVC (PersistentVolumeClaim) - 你的“租房需求”  你告诉中介：">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://guy-18.github.io/2025/08/22/PVC-StorageClass-PV%E5%8E%9F%E7%90%86%E8%A7%A3%E8%AF%BB/deepseek_mermaid_20250822_b867d7.png">
+<meta property="article:published_time" content="2025-08-22T13:50:59.000Z">
+<meta property="article:modified_time" content="2025-08-23T17:49:38.521Z">
+<meta property="article:author" content="John">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="http://guy-18.github.io/2025/08/22/PVC-StorageClass-PV%E5%8E%9F%E7%90%86%E8%A7%A3%E8%AF%BB/deepseek_mermaid_20250822_b867d7.png">
+  
+  
+  
+  <title>John的博客</title>
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/twitter-bootstrap/4.6.1/css/bootstrap.min.css" />
+
+
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/github-markdown-css/4.0.0/github-markdown.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/hint.css/2.7.0/hint.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.css" />
+
+
+
+<!-- 主题依赖的图标库，不要自行修改 -->
+<!-- Do not modify the link that theme dependent icons -->
+
+<link rel="stylesheet" href="//at.alicdn.com/t/c/font_1749284_5i9bdhy70f8.css">
+
+
+
+<link rel="stylesheet" href="//at.alicdn.com/t/c/font_1736178_k526ubmyhba.css">
+
+
+<link  rel="stylesheet" href="/css/main.css" />
+
+
+  <link id="highlight-css" rel="stylesheet" href="/css/highlight.css" />
+  
+    <link id="highlight-css-dark" rel="stylesheet" href="/css/highlight-dark.css" />
+  
+
+
+
+
+  <script id="fluid-configs">
+    var Fluid = window.Fluid || {};
+    Fluid.ctx = Object.assign({}, Fluid.ctx)
+    var CONFIG = {"hostname":"guy-18.github.io","root":"/","version":"1.9.8","typing":{"enable":true,"typeSpeed":70,"cursorChar":"_","loop":false,"scope":[]},"anchorjs":{"enable":true,"element":"h1,h2,h3,h4,h5,h6","placement":"left","visible":"hover","icon":""},"progressbar":{"enable":true,"height_px":3,"color":"#29d","options":{"showSpinner":false,"trickleSpeed":100}},"code_language":{"enable":true,"default":"TEXT"},"copy_btn":true,"image_caption":{"enable":true},"image_zoom":{"enable":true,"img_url_replace":["",""]},"toc":{"enable":true,"placement":"right","headingSelector":"h1,h2,h3,h4,h5,h6","collapseDepth":0},"lazyload":{"enable":true,"loading_img":"/img/loading.gif","onlypost":false,"offset_factor":2},"web_analytics":{"enable":false,"follow_dnt":true,"baidu":null,"google":{"measurement_id":null},"tencent":{"sid":null,"cid":null},"leancloud":{"app_id":null,"app_key":null,"server_url":null,"path":"window.location.pathname","ignore_local":false},"umami":{"src":null,"website_id":null,"domains":null,"start_time":"2024-01-01T00:00:00.000Z","token":null,"api_server":null}},"search_path":"/local-search.xml","include_content_in_search":true};
+
+    if (CONFIG.web_analytics.follow_dnt) {
+      var dntVal = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+      Fluid.ctx.dnt = dntVal && (dntVal.startsWith('1') || dntVal.startsWith('yes') || dntVal.startsWith('on'));
+    }
+  </script>
+  <script  src="/js/utils.js" ></script>
+  <script  src="/js/color-schema.js" ></script>
+  
+
+
+  
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+
+<body>
+  
+
+  <header>
+    
+
+<div class="header-inner" style="height: 70vh;">
+  <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
+  <div class="container">
+    <a class="navbar-brand" href="/">
+      <strong>Fluid</strong>
+    </a>
+
+    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
+            data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <div class="animated-icon"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Collapsible content -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ml-auto text-center">
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/" target="_self">
+                <i class="iconfont icon-home-fill"></i>
+                <span>首页</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/archives/" target="_self">
+                <i class="iconfont icon-archive-fill"></i>
+                <span>归档</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/categories/" target="_self">
+                <i class="iconfont icon-category-fill"></i>
+                <span>分类</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/tags/" target="_self">
+                <i class="iconfont icon-tags-fill"></i>
+                <span>标签</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/about/" target="_self">
+                <i class="iconfont icon-user-fill"></i>
+                <span>关于</span>
+              </a>
+            </li>
+          
+        
+        
+          <li class="nav-item" id="search-btn">
+            <a class="nav-link" target="_self" href="javascript:;" data-toggle="modal" data-target="#modalSearch" aria-label="Search">
+              <i class="iconfont icon-search"></i>
+            </a>
+          </li>
+          
+        
+        
+          <li class="nav-item" id="color-toggle-btn">
+            <a class="nav-link" target="_self" href="javascript:;" aria-label="Color Toggle">
+              <i class="iconfont icon-dark" id="color-toggle-icon"></i>
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+  
+
+<div id="banner" class="banner" parallax=true
+     style="background: url('/img/default.png') no-repeat center center; background-size: cover;">
+  <div class="full-bg-img">
+    <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
+      <div class="banner-text text-center fade-in-up">
+        <div class="h2">
+          
+            <span id="subtitle" data-typed-text=""></span>
+          
+        </div>
+
+        
+          
+  <div class="mt-3">
+    
+    
+      <span class="post-meta">
+        <i class="iconfont icon-date-fill" aria-hidden="true"></i>
+        <time datetime="2025-08-22 21:50" pubdate>
+          2025年8月22日 晚上
+        </time>
+      </span>
+    
+  </div>
+
+  <div class="mt-1">
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-chart"></i>
+        
+          5.3k 字
+        
+      </span>
+    
+
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-clock-fill"></i>
+        
+        
+        
+          44 分钟
+        
+      </span>
+    
+
+    
+    
+  </div>
+
+
+        
+      </div>
+
+      
+    </div>
+  </div>
+</div>
+
+</div>
+
+  </header>
+
+  <main>
+    
+      
+
+<div class="container-fluid nopadding-x">
+  <div class="row nomargin-x">
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+
+    </div>
+
+    <div class="col-lg-8 nopadding-x-md">
+      <div class="container nopadding-x-md" id="board-ctn">
+        <div id="board">
+          <article class="post-content mx-auto">
+            <h1 id="seo-header"></h1>
+            
+            
+              <div class="markdown-body">
+                
+                <h1 id="PVC、StorageClass、PV是什么"><a href="#PVC、StorageClass、PV是什么" class="headerlink" title="PVC、StorageClass、PV是什么"></a>PVC、StorageClass、PV是什么</h1><p>你好！欢迎来到Kubernetes的世界！你遇到的这三个概念（PVC, PV, StorageClass）确实是存储部分的核心，也是很多初学者会感到困惑的地方。别担心，我用一个简单的比喻和详细的解释来帮你彻底搞懂它们。</p>
+<h3 id="一个生动的比喻：租房"><a href="#一个生动的比喻：租房" class="headerlink" title="一个生动的比喻：租房"></a>一个生动的比喻：租房</h3><p>想象一下你要租房子：</p>
+<ol>
+<li><p><strong>PVC (PersistentVolumeClaim) - 你的“租房需求”</strong></p>
+<ul>
+<li>你告诉中介：“我需要一个<strong>不小于20平米、带窗户、月租不超过2000块</strong>的房子。” 这份“需求清单”就是你的<strong>PVC</strong>。它不关心房子具体在哪、房东是谁，只关心你的<strong>规格要求</strong>。</li>
+</ul>
+</li>
+<li><p><strong>PV (PersistentVolume) - 具体的“房子”</strong></p>
+<ul>
+<li>中介手里有一套<strong>真实的、具体的</strong>房子，地址是“XX小区1号楼101”，面积25平米，月租1800块。这套房子就是一个<strong>PV</strong>。它是集群中的<strong>一块实际的存储资源</strong>，就像一块硬盘。</li>
+</ul>
+</li>
+<li><p><strong>StorageClass - 高效的“房产开发商 + 中介”</strong></p>
+<ul>
+<li>现在，你不用等中介去找现成的房子了。有一个超级高效的<strong>“开发商+中介”联合体</strong>（StorageClass）。你一旦提出需求（PVC），这个联合体就立刻<strong>按需</strong>为你建好一套新房（PV）并租给你。它定义了<strong>如何动态地创建PV</strong>（房子的建造标准、用什么材料等）。</li>
+</ul>
+</li>
+</ol>
+<p><strong>关系总结：</strong></p>
+<ul>
+<li><strong>PVC</strong> 是 <strong>需求</strong>。</li>
+<li><strong>PV</strong> 是 <strong>资源</strong>。</li>
+<li><strong>StorageClass</strong> 是 <strong>按需创建资源的模板和自动化工具</strong>。</li>
+<li><strong>PVC 向系统申请资源，系统则寻找一个现有的PV（静态供给）或通过StorageClass创建一个新的PV（动态供给）来满足这个PVC的需求。</strong></li>
+</ul>
+<hr>
+<h3 id="详细概念解释"><a href="#详细概念解释" class="headerlink" title="详细概念解释"></a>详细概念解释</h3><h4 id="1-PV-PersistentVolume-持久化卷"><a href="#1-PV-PersistentVolume-持久化卷" class="headerlink" title="1. PV (PersistentVolume) - 持久化卷"></a>1. PV (PersistentVolume) - 持久化卷</h4><ul>
+<li><strong>是什么</strong>： 集群中的一块<strong>网络存储空间</strong>。它是集群级别的资源，就像集群中的一台Node一样，不属于任何Namespace。它是对底层共享存储（如NFS, Ceph, AWS EBS, Google Persistent Disk等）的一种抽象定义。</li>
+<li><strong>作用</strong>： <strong>提供存储</strong>。PV是有实际存储介质backing的。</li>
+<li><strong>关键配置</strong>： 定义存储容量（<code>capacity</code>）、访问模式（<code>accessModes</code>，如ReadWriteOnce, ReadOnlyMany等）和存储类型（<code>storageClassName</code>）。</li>
+</ul>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><code class="hljs yaml"><span class="hljs-attr">apiVersion:</span> <span class="hljs-string">v1</span><br><span class="hljs-attr">kind:</span> <span class="hljs-string">PersistentVolume</span><br><span class="hljs-attr">metadata:</span><br>  <span class="hljs-attr">name:</span> <span class="hljs-string">my-manual-pv</span>  <span class="hljs-comment"># PV的名字</span><br><span class="hljs-attr">spec:</span><br>  <span class="hljs-attr">capacity:</span><br>    <span class="hljs-attr">storage:</span> <span class="hljs-string">10Gi</span>  <span class="hljs-comment"># 存储大小</span><br>  <span class="hljs-attr">accessModes:</span><br>    <span class="hljs-bullet">-</span> <span class="hljs-string">ReadWriteOnce</span>  <span class="hljs-comment"># 访问模式：允许单个节点读写</span><br>  <span class="hljs-attr">persistentVolumeReclaimPolicy:</span> <span class="hljs-string">Retain</span>  <span class="hljs-comment"># 回收策略：删除PVC后，PV保留数据和本身</span><br>  <span class="hljs-attr">storageClassName:</span> <span class="hljs-string">slow</span>  <span class="hljs-comment"># 属于哪个StorageClass（可选）</span><br>  <span class="hljs-attr">nfs:</span>  <span class="hljs-comment"># 具体的后端存储类型和配置</span><br>    <span class="hljs-attr">path:</span> <span class="hljs-string">/tmp</span><br>    <span class="hljs-attr">server:</span> <span class="hljs-number">172.17</span><span class="hljs-number">.0</span><span class="hljs-number">.2</span><br></code></pre></td></tr></table></figure>
+
+<h4 id="2-PVC-PersistentVolumeClaim-持久化卷声明"><a href="#2-PVC-PersistentVolumeClaim-持久化卷声明" class="headerlink" title="2. PVC (PersistentVolumeClaim) - 持久化卷声明"></a>2. PVC (PersistentVolumeClaim) - 持久化卷声明</h4><ul>
+<li><strong>是什么</strong>： 用户（或Pod）对存储的<strong>一个请求</strong>或<strong>声明</strong>。它是Namespace级别的资源。它就像一个“提货单”。</li>
+<li><strong>作用</strong>： <strong>申请和使用存储</strong>。Pod不直接使用PV，而是通过PVC来申请合适的存储资源。PVC让用户无需关心底层存储的具体实现细节。</li>
+<li><strong>关键配置</strong>： 申请存储的大小（<code>resources.requests.storage</code>）、访问模式（<code>accessModes</code>）和通过<code>storageClassName</code>来指定向哪个StorageClass申请。</li>
+</ul>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><code class="hljs yaml"><span class="hljs-attr">apiVersion:</span> <span class="hljs-string">v1</span><br><span class="hljs-attr">kind:</span> <span class="hljs-string">PersistentVolumeClaim</span><br><span class="hljs-attr">metadata:</span><br>  <span class="hljs-attr">name:</span> <span class="hljs-string">my-pvc</span>  <span class="hljs-comment"># PVC的名字</span><br>  <span class="hljs-attr">namespace:</span> <span class="hljs-string">default</span><br><span class="hljs-attr">spec:</span><br>  <span class="hljs-attr">accessModes:</span><br>    <span class="hljs-bullet">-</span> <span class="hljs-string">ReadWriteOnce</span><br>  <span class="hljs-attr">storageClassName:</span> <span class="hljs-string">slow</span>  <span class="hljs-comment"># 指名需要由哪个StorageClass来动态 provisioning（可选）</span><br>  <span class="hljs-attr">resources:</span><br>    <span class="hljs-attr">requests:</span><br>      <span class="hljs-attr">storage:</span> <span class="hljs-string">5Gi</span>  <span class="hljs-comment"># 申请5G空间</span><br></code></pre></td></tr></table></figure>
+
+<h4 id="3-StorageClass-SC-存储类"><a href="#3-StorageClass-SC-存储类" class="headerlink" title="3. StorageClass (SC) - 存储类"></a>3. StorageClass (SC) - 存储类</h4><ul>
+<li><strong>是什么</strong>： 对存储的<strong>抽象分类</strong>和<strong>动态配置器</strong>。它定义了“一类”存储，并指定了用什么** Provisioner**（驱动）来动态创建PV。</li>
+<li><strong>作用</strong>： **实现存储的动态供给(Dynamic Provisioning)**。管理员无需预先创建一堆PV等着。当用户提交一个PVC时，Kubernetes会根据PVC中指定的StorageClass，自动调用相应的驱动去创建合适的PV。</li>
+<li><strong>关键配置</strong>： Provisioner（供应商驱动，如 <code>kubernetes.io/aws-ebs</code>）、参数（<code>parameters</code>，如磁盘类型、区域等）。</li>
+</ul>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><code class="hljs yaml"><span class="hljs-attr">apiVersion:</span> <span class="hljs-string">storage.k8s.io/v1</span><br><span class="hljs-attr">kind:</span> <span class="hljs-string">StorageClass</span><br><span class="hljs-attr">metadata:</span><br>  <span class="hljs-attr">name:</span> <span class="hljs-string">fast-ssd</span>  <span class="hljs-comment"># StorageClass的名字，PVC通过这个名字来指向它</span><br><span class="hljs-attr">provisioner:</span> <span class="hljs-string">kubernetes.io/aws-ebs</span>  <span class="hljs-comment"># 使用的驱动</span><br><span class="hljs-attr">parameters:</span><br>  <span class="hljs-attr">type:</span> <span class="hljs-string">gp3</span>  <span class="hljs-comment"># 参数：要求创建gp3类型的EBS卷</span><br>  <span class="hljs-attr">fsType:</span> <span class="hljs-string">ext4</span><br></code></pre></td></tr></table></figure>
+
+<hr>
+<h3 id="为什么Kubernetes要这样设计？"><a href="#为什么Kubernetes要这样设计？" class="headerlink" title="为什么Kubernetes要这样设计？"></a>为什么Kubernetes要这样设计？</h3><p>这种设计（PVC&#x2F;PV&#x2F;StorageClass）解决了以下几个核心问题：</p>
+<ol>
+<li><p><strong>解耦与应用和存储</strong>：</p>
+<ul>
+<li><strong>开发人员</strong>（Pod的开发者）只需要关心<strong>需要多大的存储</strong>（写PVC），而不用关心存储的具体技术细节（是NFS还是云硬盘？性能如何？）。</li>
+<li><strong>集群管理员</strong>负责管理和配置后端的存储系统和StorageClass，而不用为每个应用手动去创建对应的PV。</li>
+</ul>
+</li>
+<li><p><strong>资源的灵活性与动态性</strong>：</p>
+<ul>
+<li>**静态供给(Static Provisioning)**： 管理员预先创建一批PV。PVC只能在现有的PV池里寻找匹配的。如果找不到，申请就会 pending。这种方式很笨拙，容易造成资源浪费或不足。</li>
+<li><strong>动态供给(Dynamic Provisioning)<strong>： <strong>这是现代K8s集群的标配和推荐做法</strong>。通过StorageClass，可以实现“按需分配”。用户提交PVC -&gt; K8s看到没有现成的PV能匹配 -&gt; 调用SC创建新的PV -&gt; PVC自动绑定到新PV。</strong>极大提高了自动化程度和资源利用率</strong>。</li>
+</ul>
+</li>
+<li><p><strong>支持多种存储后端</strong>：<br>通过不同的Provisioner，Kubernetes可以无缝地接入各种各样、来自不同供应商的存储系统（公有云、私有云、本地存储等），为用户提供统一的存储使用体验。</p>
+</li>
+</ol>
+<h3 id="工作流程总结"><a href="#工作流程总结" class="headerlink" title="工作流程总结"></a>工作流程总结</h3><p>下图清晰地展示了三者之间的关系与两种供给方式的工作流程：</p>
+<p><img src="/2025/08/22/PVC-StorageClass-PV%E5%8E%9F%E7%90%86%E8%A7%A3%E8%AF%BB/deepseek_mermaid_20250822_b867d7.png" srcset="/img/loading.gif" lazyload alt="deepseek_mermaid_20250822_b867d7"></p>
+<h3 id="如何记住和使用？"><a href="#如何记住和使用？" class="headerlink" title="如何记住和使用？"></a>如何记住和使用？</h3><ul>
+<li><strong>作为使用者（开发者）</strong>：你99%的情况只需要和<strong>PVC</strong>打交道。在你的Deployment的Pod模板中，定义<code>volumes</code>时引用的是<strong>PVC的名字</strong>。<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><code class="hljs yaml"><span class="hljs-attr">volumes:</span><br>  <span class="hljs-bullet">-</span> <span class="hljs-attr">name:</span> <span class="hljs-string">app-storage</span><br>    <span class="hljs-attr">persistentVolumeClaim:</span><br>      <span class="hljs-attr">claimName:</span> <span class="hljs-string">my-pvc</span>  <span class="hljs-comment"># 你上面创建的PVC的名字</span><br></code></pre></td></tr></table></figure></li>
+<li><strong>作为管理员</strong>：你需要根据公司的存储基础设施，创建和维护合适的<strong>StorageClass</strong>。对于简单的测试环境（如minikube），通常已经有一个默认的StorageClass。</li>
+</ul>
+<p>希望这个解释能帮你彻底理解这三个概念！这是掌握Kubernetes持久化存储非常重要的一步。祝你学习顺利！</p>
+<h1 id="Kubernetes-持久化存储实战：NFS-动态供给示例"><a href="#Kubernetes-持久化存储实战：NFS-动态供给示例" class="headerlink" title="Kubernetes 持久化存储实战：NFS 动态供给示例"></a>Kubernetes 持久化存储实战：NFS 动态供给示例</h1><p>我理解你希望在理解PVC、PV和StorageClass的基本概念后，通过一个具体的实战例子来加深理解。下面我将以一个基于<strong>NFS存储</strong>的<strong>动态存储配置</strong>为例，详细展示如何在实际的Kubernetes集群中创建和使用这些资源。</p>
+<p>这个例子会使用NFS作为后端存储，并部署一个NFS Client Provisioner来动态创建PV。之后，我们会创建一个PVC来申请存储，最后在一个Pod中使用这个PVC。</p>
+<h1 id="🚀-Kubernetes-持久化存储实战：NFS-动态供给示例"><a href="#🚀-Kubernetes-持久化存储实战：NFS-动态供给示例" class="headerlink" title="🚀 Kubernetes 持久化存储实战：NFS 动态供给示例"></a>🚀 Kubernetes 持久化存储实战：NFS 动态供给示例</h1><p>为了让刚才讨论的存储概念更加具体，我们来看一个基于NFS（Network File System）的<strong>动态存储配置实战例子</strong>。在这个例子中，我们会：</p>
+<ol>
+<li><strong>搭建NFS服务器</strong>（假设还没有）</li>
+<li><strong>部署NFS Client Provisioner</strong>（负责动态创建PV）</li>
+<li><strong>创建StorageClass</strong></li>
+<li><strong>创建PVC并验证动态创建PV</strong></li>
+<li><strong>在Pod中使用PVC</strong></li>
+</ol>
+<h2 id="准备工作：准备NFS服务器"><a href="#准备工作：准备NFS服务器" class="headerlink" title="准备工作：准备NFS服务器"></a>准备工作：准备NFS服务器</h2><p>首先，你需要一个NFS服务器。如果你还没有，可以在一个Linux节点（可以是Kubernetes集群中的一个节点，也可以是外部节点）上快速搭建：</p>
+<ol>
+<li><p><strong>安装NFS服务器</strong>（在NFS服务器节点上执行）：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><code class="hljs bash"><span class="hljs-built_in">sudo</span> apt-get update &amp;&amp; <span class="hljs-built_in">sudo</span> apt-get install -y nfs-kernel-server <span class="hljs-comment"># 对于Ubuntu/Debian</span><br><span class="hljs-comment"># 或者</span><br><span class="hljs-comment"># sudo yum install -y nfs-utils nfs-utils-lib # 对于CentOS/RHEL</span><br></code></pre></td></tr></table></figure>
+</li>
+<li><p><strong>创建共享目录并配置导出</strong>：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><code class="hljs bash"><span class="hljs-built_in">sudo</span> <span class="hljs-built_in">mkdir</span> -p /srv/nfs/k8s-pv  <span class="hljs-comment"># 创建一个共享目录</span><br><span class="hljs-built_in">sudo</span> <span class="hljs-built_in">chown</span> nobody:nogroup /srv/nfs/k8s-pv  <span class="hljs-comment"># 修改目录所有权，根据NFS配置可能需要</span><br><span class="hljs-built_in">sudo</span> <span class="hljs-built_in">chmod</span> 777 /srv/nfs/k8s-pv  <span class="hljs-comment"># 为了示例简单，设置宽松的权限</span><br></code></pre></td></tr></table></figure>
+<p>编辑 <code>/etc/exports</code> 文件，添加以下行（请根据你的网络情况调整网段）：</p>
+<figure class="highlight awk"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs awk"><span class="hljs-regexp">/srv/</span>nfs<span class="hljs-regexp">/k8s-pv 192.168.100.0/</span><span class="hljs-number">24</span>(rw,sync,no_subtree_check,no_root_squash)<br></code></pre></td></tr></table></figure>
+<p>保存后，导出配置：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><code class="hljs bash"><span class="hljs-built_in">sudo</span> exportfs -a<br><span class="hljs-built_in">sudo</span> systemctl restart nfs-kernel-server<br><span class="hljs-built_in">sudo</span> systemctl <span class="hljs-built_in">enable</span> nfs-kernel-server<br></code></pre></td></tr></table></figure>
+</li>
+<li><p><strong>（可选）在Kubernetes集群节点上安装NFS客户端</strong>：<br>通常，Kubernetes节点已经安装了NFS客户端支持。如果没有，你可能需要安装 <code>nfs-common</code> (Ubuntu&#x2F;Debian) 或 <code>nfs-utils</code> (CentOS&#x2F;RHEL)。</p>
+</li>
+</ol>
+<h2 id="步骤一：部署NFS-Client-Provisioner"><a href="#步骤一：部署NFS-Client-Provisioner" class="headerlink" title="步骤一：部署NFS Client Provisioner"></a>步骤一：部署NFS Client Provisioner</h2><p>NFS本身不支持动态供给，我们需要一个叫做 <strong>NFS Client Provisioner</strong> 的控制器，它可以根据PVC的请求，自动在NFS服务器上创建目录并生成对应的PV。</p>
+<p>首先，我们需要为Provisioner创建RBAC（基于角色的访问控制）资源，因为它需要在集群中创建PV等资源。</p>
+<h3 id="1-创建RBAC授权"><a href="#1-创建RBAC授权" class="headerlink" title="1. 创建RBAC授权"></a>1. 创建RBAC授权</h3><p>将以下内容保存为 <code>nfs-rbac.yaml</code> 文件：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br></pre></td><td class="code"><pre><code class="hljs yaml"><span class="hljs-attr">apiVersion:</span> <span class="hljs-string">v1</span><br><span class="hljs-attr">kind:</span> <span class="hljs-string">ServiceAccount</span><br><span class="hljs-attr">metadata:</span><br>  <span class="hljs-attr">name:</span> <span class="hljs-string">nfs-client-provisioner</span><br>  <span class="hljs-attr">namespace:</span> <span class="hljs-string">default</span> <span class="hljs-comment"># 通常部署在default命名空间，可根据需要修改</span><br><span class="hljs-meta">---</span><br><span class="hljs-attr">kind:</span> <span class="hljs-string">ClusterRole</span><br><span class="hljs-attr">apiVersion:</span> <span class="hljs-string">rbac.authorization.k8s.io/v1</span><br><span class="hljs-attr">metadata:</span><br>  <span class="hljs-attr">name:</span> <span class="hljs-string">nfs-client-provisioner-runner</span><br><span class="hljs-attr">rules:</span><br>  <span class="hljs-bullet">-</span> <span class="hljs-attr">apiGroups:</span> [<span class="hljs-string">&quot;&quot;</span>]<br>    <span class="hljs-attr">resources:</span> [<span class="hljs-string">&quot;persistentvolumes&quot;</span>]<br>    <span class="hljs-attr">verbs:</span> [<span class="hljs-string">&quot;get&quot;</span>, <span class="hljs-string">&quot;list&quot;</span>, <span class="hljs-string">&quot;watch&quot;</span>, <span class="hljs-string">&quot;create&quot;</span>, <span class="hljs-string">&quot;delete&quot;</span>]<br>  <span class="hljs-bullet">-</span> <span class="hljs-attr">apiGroups:</span> [<span class="hljs-string">&quot;&quot;</span>]<br>    <span class="hljs-attr">resources:</span> [<span class="hljs-string">&quot;persistentvolumeclaims&quot;</span>]<br>    <span class="hljs-attr">verbs:</span> [<span class="hljs-string">&quot;get&quot;</span>, <span class="hljs-string">&quot;list&quot;</span>, <span class="hljs-string">&quot;watch&quot;</span>, <span class="hljs-string">&quot;update&quot;</span>]<br>  <span class="hljs-bullet">-</span> <span class="hljs-attr">apiGroups:</span> [<span class="hljs-string">&quot;storage.k8s.io&quot;</span>]<br>    <span class="hljs-attr">resources:</span> [<span class="hljs-string">&quot;storageclasses&quot;</span>]<br>    <span class="hljs-attr">verbs:</span> [<span class="hljs-string">&quot;get&quot;</span>, <span class="hljs-string">&quot;list&quot;</span>, <span class="hljs-string">&quot;watch&quot;</span>]<br>  <span class="hljs-bullet">-</span> <span class="hljs-attr">apiGroups:</span> [<span class="hljs-string">&quot;&quot;</span>]<br>    <span class="hljs-attr">resources:</span> [<span class="hljs-string">&quot;events&quot;</span>]<br>    <span class="hljs-attr">verbs:</span> [<span class="hljs-string">&quot;create&quot;</span>, <span class="hljs-string">&quot;update&quot;</span>, <span class="hljs-string">&quot;patch&quot;</span>]<br>  <span class="hljs-bullet">-</span> <span class="hljs-attr">apiGroups:</span> [<span class="hljs-string">&quot;&quot;</span>]<br>    <span class="hljs-attr">resources:</span> [<span class="hljs-string">&quot;endpoints&quot;</span>]<br>    <span class="hljs-attr">verbs:</span> [<span class="hljs-string">&quot;get&quot;</span>, <span class="hljs-string">&quot;list&quot;</span>, <span class="hljs-string">&quot;watch&quot;</span>, <span class="hljs-string">&quot;create&quot;</span>, <span class="hljs-string">&quot;update&quot;</span>, <span class="hljs-string">&quot;patch&quot;</span>]<br><span class="hljs-meta">---</span><br><span class="hljs-attr">kind:</span> <span class="hljs-string">ClusterRoleBinding</span><br><span class="hljs-attr">apiVersion:</span> <span class="hljs-string">rbac.authorization.k8s.io/v1</span><br><span class="hljs-attr">metadata:</span><br>  <span class="hljs-attr">name:</span> <span class="hljs-string">run-nfs-client-provisioner</span><br><span class="hljs-attr">subjects:</span><br>  <span class="hljs-bullet">-</span> <span class="hljs-attr">kind:</span> <span class="hljs-string">ServiceAccount</span><br>    <span class="hljs-attr">name:</span> <span class="hljs-string">nfs-client-provisioner</span><br>    <span class="hljs-attr">namespace:</span> <span class="hljs-string">default</span><br><span class="hljs-attr">roleRef:</span><br>  <span class="hljs-attr">kind:</span> <span class="hljs-string">ClusterRole</span><br>  <span class="hljs-attr">name:</span> <span class="hljs-string">nfs-client-provisioner-runner</span><br>  <span class="hljs-attr">apiGroup:</span> <span class="hljs-string">rbac.authorization.k8s.io</span><br><span class="hljs-meta">---</span><br><span class="hljs-comment"># 如果需要Leader选举，可能还需要一个Role和RoleBinding</span><br><span class="hljs-attr">kind:</span> <span class="hljs-string">Role</span><br><span class="hljs-attr">apiVersion:</span> <span class="hljs-string">rbac.authorization.k8s.io/v1</span><br><span class="hljs-attr">metadata:</span><br>  <span class="hljs-attr">name:</span> <span class="hljs-string">leader-locking-nfs-client-provisioner</span><br>  <span class="hljs-attr">namespace:</span> <span class="hljs-string">default</span><br><span class="hljs-attr">rules:</span><br>  <span class="hljs-bullet">-</span> <span class="hljs-attr">apiGroups:</span> [<span class="hljs-string">&quot;&quot;</span>]<br>    <span class="hljs-attr">resources:</span> [<span class="hljs-string">&quot;endpoints&quot;</span>]<br>    <span class="hljs-attr">verbs:</span> [<span class="hljs-string">&quot;get&quot;</span>, <span class="hljs-string">&quot;create&quot;</span>, <span class="hljs-string">&quot;update&quot;</span>, <span class="hljs-string">&quot;patch&quot;</span>]<br><span class="hljs-meta">---</span><br><span class="hljs-attr">kind:</span> <span class="hljs-string">RoleBinding</span><br><span class="hljs-attr">apiVersion:</span> <span class="hljs-string">rbac.authorization.k8s.io/v1</span><br><span class="hljs-attr">metadata:</span><br>  <span class="hljs-attr">name:</span> <span class="hljs-string">leader-locking-nfs-client-provisioner</span><br>  <span class="hljs-attr">namespace:</span> <span class="hljs-string">default</span><br><span class="hljs-attr">subjects:</span><br>  <span class="hljs-bullet">-</span> <span class="hljs-attr">kind:</span> <span class="hljs-string">ServiceAccount</span><br>    <span class="hljs-attr">name:</span> <span class="hljs-string">nfs-client-provisioner</span><br>    <span class="hljs-attr">namespace:</span> <span class="hljs-string">default</span><br><span class="hljs-attr">roleRef:</span><br>  <span class="hljs-attr">kind:</span> <span class="hljs-string">Role</span><br>  <span class="hljs-attr">name:</span> <span class="hljs-string">leader-locking-nfs-client-provisioner</span><br>  <span class="hljs-attr">apiGroup:</span> <span class="hljs-string">rbac.authorization.k8s.io</span><br></code></pre></td></tr></table></figure>
+<p>应用RBAC配置：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs bash">kubectl apply -f nfs-rbac.yaml<br></code></pre></td></tr></table></figure>
+
+<h3 id="2-部署NFS-Client-Provisioner"><a href="#2-部署NFS-Client-Provisioner" class="headerlink" title="2. 部署NFS Client Provisioner"></a>2. 部署NFS Client Provisioner</h3><p>将以下内容保存为 <code>nfs-provisioner-deployment.yaml</code> 文件。<strong>请务必将 <code>192.168.100.200</code> 替换为你实际的NFS服务器IP地址，将 <code>/srv/nfs/k8s-pv</code> 替换为你实际的NFS共享路径。</strong></p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><code class="hljs yaml"><span class="hljs-attr">apiVersion:</span> <span class="hljs-string">apps/v1</span><br><span class="hljs-attr">kind:</span> <span class="hljs-string">Deployment</span><br><span class="hljs-attr">metadata:</span><br>  <span class="hljs-attr">name:</span> <span class="hljs-string">nfs-client-provisioner</span><br>  <span class="hljs-attr">namespace:</span> <span class="hljs-string">default</span><br>  <span class="hljs-attr">labels:</span><br>    <span class="hljs-attr">app:</span> <span class="hljs-string">nfs-client-provisioner</span><br><span class="hljs-attr">spec:</span><br>  <span class="hljs-attr">replicas:</span> <span class="hljs-number">1</span><br>  <span class="hljs-attr">strategy:</span><br>    <span class="hljs-attr">type:</span> <span class="hljs-string">Recreate</span><br>  <span class="hljs-attr">selector:</span><br>    <span class="hljs-attr">matchLabels:</span><br>      <span class="hljs-attr">app:</span> <span class="hljs-string">nfs-client-provisioner</span><br>  <span class="hljs-attr">template:</span><br>    <span class="hljs-attr">metadata:</span><br>      <span class="hljs-attr">labels:</span><br>        <span class="hljs-attr">app:</span> <span class="hljs-string">nfs-client-provisioner</span><br>    <span class="hljs-attr">spec:</span><br>      <span class="hljs-attr">serviceAccountName:</span> <span class="hljs-string">nfs-client-provisioner</span><br>      <span class="hljs-attr">containers:</span><br>        <span class="hljs-bullet">-</span> <span class="hljs-attr">name:</span> <span class="hljs-string">nfs-client-provisioner</span><br>          <span class="hljs-comment"># 一个常用的NFS Client Provisioner镜像</span><br>          <span class="hljs-attr">image:</span> <span class="hljs-string">chronolaw/nfs-subdir-external-provisioner:v4.0.2</span><br>          <span class="hljs-attr">volumeMounts:</span><br>            <span class="hljs-bullet">-</span> <span class="hljs-attr">name:</span> <span class="hljs-string">nfs-client-root</span><br>              <span class="hljs-attr">mountPath:</span> <span class="hljs-string">/persistentvolumes</span><br>          <span class="hljs-attr">env:</span><br>            <span class="hljs-bullet">-</span> <span class="hljs-attr">name:</span> <span class="hljs-string">PROVISIONER_NAME</span><br>              <span class="hljs-attr">value:</span> <span class="hljs-string">nfs-storage</span> <span class="hljs-comment"># 分配器的名称，后续创建StorageClass时会用到</span><br>            <span class="hljs-bullet">-</span> <span class="hljs-attr">name:</span> <span class="hljs-string">NFS_SERVER</span><br>              <span class="hljs-attr">value:</span> <span class="hljs-number">192.168</span><span class="hljs-number">.100</span><span class="hljs-number">.200</span> <span class="hljs-comment"># 请修改为你的NFS服务器IP</span><br>            <span class="hljs-bullet">-</span> <span class="hljs-attr">name:</span> <span class="hljs-string">NFS_PATH</span><br>              <span class="hljs-attr">value:</span> <span class="hljs-string">/srv/nfs/k8s-pv</span> <span class="hljs-comment"># 请修改为你的NFS共享目录</span><br>      <span class="hljs-attr">volumes:</span><br>        <span class="hljs-bullet">-</span> <span class="hljs-attr">name:</span> <span class="hljs-string">nfs-client-root</span><br>          <span class="hljs-attr">nfs:</span><br>            <span class="hljs-attr">server:</span> <span class="hljs-number">192.168</span><span class="hljs-number">.100</span><span class="hljs-number">.200</span> <span class="hljs-comment"># 请修改为你的NFS服务器IP</span><br>            <span class="hljs-attr">path:</span> <span class="hljs-string">/srv/nfs/k8s-pv</span> <span class="hljs-comment"># 请修改为你的NFS共享目录</span><br></code></pre></td></tr></table></figure>
+<p>应用Deployment配置：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs bash">kubectl apply -f nfs-provisioner-deployment.yaml<br></code></pre></td></tr></table></figure>
+<p>验证Provisioner Pod是否运行成功：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs bash">kubectl get pods -l app=nfs-client-provisioner<br></code></pre></td></tr></table></figure>
+
+<h2 id="步骤二：创建StorageClass"><a href="#步骤二：创建StorageClass" class="headerlink" title="步骤二：创建StorageClass"></a>步骤二：创建StorageClass</h2><p>现在我们来创建一个StorageClass，它指定使用我们刚部署的NFS Provisioner。</p>
+<p>将以下内容保存为 <code>nfs-storageclass.yaml</code> 文件：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><code class="hljs yaml"><span class="hljs-attr">apiVersion:</span> <span class="hljs-string">storage.k8s.io/v1</span><br><span class="hljs-attr">kind:</span> <span class="hljs-string">StorageClass</span><br><span class="hljs-attr">metadata:</span><br>  <span class="hljs-attr">name:</span> <span class="hljs-string">nfs-client</span><br>  <span class="hljs-attr">annotations:</span><br>    <span class="hljs-comment"># （可选）将其设置为默认StorageClass</span><br>    <span class="hljs-comment"># storageclass.kubernetes.io/is-default-class: &quot;true&quot;</span><br><span class="hljs-attr">provisioner:</span> <span class="hljs-string">nfs-storage</span> <span class="hljs-comment"># 必须与上面Deployment中PROVISIONER_NAME的值一致</span><br><span class="hljs-attr">parameters:</span><br>  <span class="hljs-attr">archiveOnDelete:</span> <span class="hljs-string">&quot;false&quot;</span> <span class="hljs-comment"># 设置为&quot;false&quot;时，删除PVC时会同时删除PV中的数据；&quot;true&quot;则会归档（重命名目录）</span><br><span class="hljs-attr">allowVolumeExpansion:</span> <span class="hljs-literal">true</span> <span class="hljs-comment"># 允许后续扩容PVC</span><br><span class="hljs-attr">reclaimPolicy:</span> <span class="hljs-string">Delete</span> <span class="hljs-comment"># 回收策略，Delete 或 Retain。如果设置为Retain，删除PVC后PV会保留，数据需要手动清理</span><br><span class="hljs-attr">volumeBindingMode:</span> <span class="hljs-string">Immediate</span><br></code></pre></td></tr></table></figure>
+<p>应用StorageClass配置：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs bash">kubectl apply -f nfs-storageclass.yaml<br></code></pre></td></tr></table></figure>
+<p>查看创建的StorageClass：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs bash">kubectl get storageclass<br></code></pre></td></tr></table></figure>
+<p><strong>（可选）如果你想将其设为默认StorageClass，可以先取消现有默认StorageClass的默认设置（如果有），然后再设置新的：</strong></p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><code class="hljs bash"><span class="hljs-comment"># 取消现有的默认StorageClass（将现有的默认StorageClass名称替换&lt;existing-default-sc-name&gt;）</span><br>kubectl patch storageclass &lt;existing-default-sc-name&gt; -p <span class="hljs-string">&#x27;&#123;&quot;metadata&quot;: &#123;&quot;annotations&quot;:&#123;&quot;storageclass.kubernetes.io/is-default-class&quot;:&quot;false&quot;&#125;&#125;&#125;&#x27;</span><br><span class="hljs-comment"># 将nfs-client设置为默认</span><br>kubectl patch storageclass nfs-client -p <span class="hljs-string">&#x27;&#123;&quot;metadata&quot;: &#123;&quot;annotations&quot;:&#123;&quot;storageclass.kubernetes.io/is-default-class&quot;:&quot;true&quot;&#125;&#125;&#125;&#x27;</span><br></code></pre></td></tr></table></figure>
+
+<h2 id="步骤三：创建PVC并验证动态PV创建"><a href="#步骤三：创建PVC并验证动态PV创建" class="headerlink" title="步骤三：创建PVC并验证动态PV创建"></a>步骤三：创建PVC并验证动态PV创建</h2><p>现在，当我们创建一个PVC并指定 <code>storageClassName: nfs-client</code> 时，NFS Provisioner就会自动创建一个PV并与该PVC绑定。</p>
+<h3 id="1-创建PVC"><a href="#1-创建PVC" class="headerlink" title="1. 创建PVC"></a>1. 创建PVC</h3><p>将以下内容保存为 <code>test-pvc.yaml</code> 文件：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><code class="hljs yaml"><span class="hljs-attr">apiVersion:</span> <span class="hljs-string">v1</span><br><span class="hljs-attr">kind:</span> <span class="hljs-string">PersistentVolumeClaim</span><br><span class="hljs-attr">metadata:</span><br>  <span class="hljs-attr">name:</span> <span class="hljs-string">test-pvc</span><br>  <span class="hljs-attr">namespace:</span> <span class="hljs-string">default</span><br><span class="hljs-attr">spec:</span><br>  <span class="hljs-attr">storageClassName:</span> <span class="hljs-string">nfs-client</span> <span class="hljs-comment"># 与上面创建的StorageClass名称一致</span><br>  <span class="hljs-attr">accessModes:</span><br>    <span class="hljs-bullet">-</span> <span class="hljs-string">ReadWriteOnce</span> <span class="hljs-comment"># 根据你的需求选择访问模式，NFS通常也支持ReadWriteMany</span><br>  <span class="hljs-attr">resources:</span><br>    <span class="hljs-attr">requests:</span><br>      <span class="hljs-attr">storage:</span> <span class="hljs-string">1Gi</span> <span class="hljs-comment"># 请求1GiB的存储空间</span><br></code></pre></td></tr></table></figure>
+<p>应用PVC配置：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs bash">kubectl apply -f test-pvc.yaml<br></code></pre></td></tr></table></figure>
+
+<h3 id="2-验证PVC和PV"><a href="#2-验证PVC和PV" class="headerlink" title="2. 验证PVC和PV"></a>2. 验证PVC和PV</h3><p>检查PVC状态，应显示为 <code>Bound</code>：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs bash">kubectl get pvc test-pvc<br></code></pre></td></tr></table></figure>
+<p>同时，检查自动创建的PV，状态也应为 <code>Bound</code>：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs bash">kubectl get pv<br></code></pre></td></tr></table></figure>
+<p>你应该能看到一个PV是由 <code>nfs-client</code> StorageClass动态创建的，并自动绑定到了 <code>test-pvc</code> PVC。</p>
+<h2 id="步骤四：在Pod中使用PVC"><a href="#步骤四：在Pod中使用PVC" class="headerlink" title="步骤四：在Pod中使用PVC"></a>步骤四：在Pod中使用PVC</h2><p>最后，我们创建一个Pod来使用这个PVC。</p>
+<p>将以下内容保存为 <code>test-pod.yaml</code> 文件：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><code class="hljs yaml"><span class="hljs-attr">apiVersion:</span> <span class="hljs-string">v1</span><br><span class="hljs-attr">kind:</span> <span class="hljs-string">Pod</span><br><span class="hljs-attr">metadata:</span><br>  <span class="hljs-attr">name:</span> <span class="hljs-string">test-pod</span><br>  <span class="hljs-attr">namespace:</span> <span class="hljs-string">default</span><br><span class="hljs-attr">spec:</span><br>  <span class="hljs-attr">containers:</span><br>  <span class="hljs-bullet">-</span> <span class="hljs-attr">name:</span> <span class="hljs-string">busybox</span><br>    <span class="hljs-attr">image:</span> <span class="hljs-string">busybox</span><br>    <span class="hljs-attr">command:</span> [<span class="hljs-string">&#x27;sh&#x27;</span>, <span class="hljs-string">&#x27;-c&#x27;</span>, <span class="hljs-string">&#x27;echo &quot;Hello Kubernetes Storage!&quot; &gt; /mnt/data/file.txt &amp;&amp; sleep 3600&#x27;</span>]<br>    <span class="hljs-attr">volumeMounts:</span><br>    <span class="hljs-bullet">-</span> <span class="hljs-attr">name:</span> <span class="hljs-string">persistent-storage</span><br>      <span class="hljs-attr">mountPath:</span> <span class="hljs-string">/mnt/data</span><br>  <span class="hljs-attr">volumes:</span><br>  <span class="hljs-bullet">-</span> <span class="hljs-attr">name:</span> <span class="hljs-string">persistent-storage</span><br>    <span class="hljs-attr">persistentVolumeClaim:</span><br>      <span class="hljs-attr">claimName:</span> <span class="hljs-string">test-pvc</span> <span class="hljs-comment"># 使用我们刚才创建的PVC</span><br></code></pre></td></tr></table></figure>
+<p>应用Pod配置：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs bash">kubectl apply -f test-pod.yaml<br></code></pre></td></tr></table></figure>
+<p>检查Pod是否运行成功：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs bash">kubectl get pod test-pod<br></code></pre></td></tr></table></figure>
+<p>验证数据是否成功写入NFS服务器：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><code class="hljs bash"><span class="hljs-comment"># 检查Pod日志，应该能看到命令执行成功</span><br>kubectl logs test-pod<br><span class="hljs-comment"># 现在你可以到你的NFS服务器上查看共享目录 /srv/nfs/k8s-pv</span><br><span class="hljs-comment"># 你应该能看到一个以命名空间、PVC名称和PV名称组合格式命名的目录（具体格式取决于provisioner）</span><br><span class="hljs-comment"># 进入该目录，应该能看到 file.txt 文件</span><br><span class="hljs-built_in">ls</span> -la /srv/nfs/k8s-pv/ <span class="hljs-comment"># 在NFS服务器上执行</span><br></code></pre></td></tr></table></figure>
+
+<h2 id="步骤五：清理资源（可选）"><a href="#步骤五：清理资源（可选）" class="headerlink" title="步骤五：清理资源（可选）"></a>步骤五：清理资源（可选）</h2><p>当你完成测试后，可以按顺序删除资源：</p>
+<ol>
+<li>删除Pod：<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs bash">kubectl delete pod test-pod<br></code></pre></td></tr></table></figure></li>
+<li>删除PVC（<strong>如果StorageClass的reclaimPolicy是Delete，删除PVC会自动删除对应的PV以及NFS服务器上的数据</strong>）：<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs bash">kubectl delete pvc test-pvc<br></code></pre></td></tr></table></figure>
+检查PV是否也被自动删除：<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs bash">kubectl get pv<br></code></pre></td></tr></table></figure></li>
+<li>（可选）删除StorageClass和Provisioner：<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><code class="hljs bash">kubectl delete storageclass nfs-client<br>kubectl delete -f nfs-provisioner-deployment.yaml<br>kubectl delete -f nfs-rbac.yaml<br></code></pre></td></tr></table></figure></li>
+</ol>
+<h2 id="实战小结与注意事项"><a href="#实战小结与注意事项" class="headerlink" title="实战小结与注意事项"></a>实战小结与注意事项</h2><p>通过以上步骤，你应该成功完成了一个<strong>动态存储供给</strong>的实战例子。这个过程展示了：</p>
+<ul>
+<li><strong>StorageClass</strong> 如何作为存储的“蓝图”或“分类”，定义了动态供给PV的规则和参数。</li>
+<li><strong>PVC</strong> 如何作为用户对存储的请求，只需声明所需存储的大小和访问模式，而无需关心后端存储的具体细节。</li>
+<li>当PVC被创建时，<strong>Kubernetes会根据PVC指定的StorageClass，调用相应的Provisioner（这里是NFS Client Provisioner）动态地创建PV</strong>，并完成绑定。</li>
+<li><strong>Pod</strong> 通过在其Volume中引用PVC名称来使用持久化存储。</li>
+</ul>
+<h3 id="⚠️-注意事项："><a href="#⚠️-注意事项：" class="headerlink" title="⚠️ 注意事项："></a>⚠️ 注意事项：</h3><ul>
+<li><strong>NFS性能</strong>：NFS适用于多种场景，但对于需要高性能IO（如数据库）的工作负载，可能需要考虑块存储（如云提供商提供的块存储服务）。</li>
+<li><strong>数据安全</strong>：示例中为了简单，设置了宽松的NFS目录权限。在生产环境中，请根据安全最佳实践配置适当的权限。</li>
+<li><strong>Reclaim Policy</strong>：仔细选择 <code>reclaimPolicy</code>。<code>Delete</code> 方便但可能误删数据；<code>Retain</code> 更安全，但需要手动管理PV和存储资源的清理。</li>
+<li><strong>访问模式</strong>：根据你的应用需求正确选择PVC的访问模式（ReadWriteOnce, ReadOnlyMany, ReadWriteMany）。NFS通常支持ReadWriteMany（多个节点同时读写），但并非所有存储系统都支持。</li>
+<li><strong>StorageClass的命名</strong>：确保PVC中引用的 <code>storageClassName</code> 与你创建的StorageClass名称完全一致。</li>
+<li><strong>Provisioner高可用</strong>：考虑生产环境中Provisioner的高可用性部署。</li>
+</ul>
+<p>这个NFS动态供给的例子是学习和测试Kubernetes持久化存储的良好起点。在实际生产环境中，各大云厂商（如AWS、GCP、Azure）通常提供其自身的StorageClass和CSI驱动，你可以根据实际需求选择和使用。</p>
+<p>希望这个详细的实战例子能帮助你更好地理解PVC、PV和StorageClass是如何协同工作的！</p>
+<p>如果你想了解更多关于特定云提供商（如AWS EBS, GCP PD, Azure Disk）的存储配置，或者StatefulSet中使用VolumeClaimTemplates的例子，我可以进一步为你介绍。</p>
+<h1 id="为什么要设置一个StorageClass层"><a href="#为什么要设置一个StorageClass层" class="headerlink" title="为什么要设置一个StorageClass层"></a>为什么要设置一个StorageClass层</h1><p>这个问题问得非常好，直击了Kubernetes设计哲学的核心！你的观察很敏锐：从表面上看，StorageClass确实像一个“中间人”，但这恰恰是Kubernetes为了实现<strong>解耦</strong>和<strong>灵活性</strong>而做出的精妙设计。</p>
+<p>为什么不让PVC直接指定Provisioner？主要有以下几个核心原因：</p>
+<h3 id="1-抽象与解耦-Abstraction-Decoupling"><a href="#1-抽象与解耦-Abstraction-Decoupling" class="headerlink" title="1. 抽象与解耦 (Abstraction &amp; Decoupling)"></a>1. 抽象与解耦 (Abstraction &amp; Decoupling)</h3><p>这是最根本的原因。Kubernetes的设计理念是让<strong>应用开发者</strong>和<strong>集群管理员</strong>的关注点分离。</p>
+<ul>
+<li><strong>对应用开发者而言</strong>：他们只需要关心<strong>需要什么样的存储</strong>（例如：“我需要10Gi的高速SSD存储”），而不需要关心底层是用AWS EBS、Google Persistent Disk、还是NFS来实现的。他们更不应该去配置Provisioner的具体参数（比如磁盘的IOPS、类型、区域等）。<ul>
+<li><strong>PVC是面向开发者的接口</strong>，它只定义需求（容量、访问模式、存储“类别”）。</li>
+</ul>
+</li>
+<li><strong>对集群管理员而言</strong>：他们负责规划和维护后端的存储基础设施。他们定义好不同的<strong>StorageClass</strong>（比如 <code>gold-ssd</code>, <code>silver-hdd</code>, <code>backup-nfs</code>），每个Class背后都配置好了正确的Provisioner和所有复杂的参数。<ul>
+<li><strong>StorageClass是面向管理员的接口</strong>，它封装了“如何提供存储”的具体实现细节。</li>
+</ul>
+</li>
+</ul>
+<p><strong>如果没有StorageClass</strong>，PVC就得直接指定Provisioner（比如 <code>provisioner: kubernetes.io/aws-ebs</code>），这就意味着：</p>
+<ul>
+<li><strong>应用和基础设施强耦合</strong>：你的应用YAML文件就和你所在的云平台（AWS）绑死了。如果你想把这个应用部署到另一个环境（比如Azure），你就必须修改所有PVC的YAML文件，把Provisioner换成Azure的（<code>kubernetes.io/azure-disk</code>）。</li>
+<li><strong>开发者需要了解运维知识</strong>：开发者被迫要去知道Provisioner的名称和参数，这违背了关注点分离的原则。</li>
+</ul>
+<h3 id="2-参数化配置-Parameterization"><a href="#2-参数化配置-Parameterization" class="headerlink" title="2. 参数化配置 (Parameterization)"></a>2. 参数化配置 (Parameterization)</h3><p>一个Provisioner通常有多种配置方式。例如，AWS EBS Provisioner可以创建通用型（gp3）、预配置IOPS型（io1）或冷存储型（sc1）的卷。</p>
+<p>StorageClass提供了一个<strong>参数块</strong>（<code>parameters</code>）来优雅地处理这些配置。</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><code class="hljs yaml"><span class="hljs-comment"># 管理员可以定义多种StorageClass，使用同一个Provisioner但参数不同</span><br><span class="hljs-attr">apiVersion:</span> <span class="hljs-string">storage.k8s.io/v1</span><br><span class="hljs-attr">kind:</span> <span class="hljs-string">StorageClass</span><br><span class="hljs-attr">metadata:</span><br>  <span class="hljs-attr">name:</span> <span class="hljs-string">fast-ssd</span><br><span class="hljs-attr">provisioner:</span> <span class="hljs-string">kubernetes.io/aws-ebs</span><br><span class="hljs-attr">parameters:</span><br>  <span class="hljs-attr">type:</span> <span class="hljs-string">io1</span> <span class="hljs-comment"># 使用io1类型</span><br>  <span class="hljs-attr">iopsPerGB:</span> <span class="hljs-string">&quot;50&quot;</span> <span class="hljs-comment"># 配置高IOPS</span><br><br><span class="hljs-meta">---</span><br><span class="hljs-attr">apiVersion:</span> <span class="hljs-string">storage.k8s.io/v1</span><br><span class="hljs-attr">kind:</span> <span class="hljs-string">StorageClass</span><br><span class="hljs-attr">metadata:</span><br>  <span class="hljs-attr">name:</span> <span class="hljs-string">standard-ssd</span><br><span class="hljs-attr">provisioner:</span> <span class="hljs-string">kubernetes.io/aws-ebs</span> <span class="hljs-comment"># 同一个Provisioner</span><br><span class="hljs-attr">parameters:</span><br>  <span class="hljs-attr">type:</span> <span class="hljs-string">gp3</span> <span class="hljs-comment"># 但使用更经济的gp3类型</span><br>  <span class="hljs-attr">iops:</span> <span class="hljs-string">&quot;3000&quot;</span> <span class="hljs-comment"># 配置固定的IOPS</span><br></code></pre></td></tr></table></figure>
+
+<p>如果让PVC直接指定Provisioner，这些复杂的参数就得全部挤在PVC的定义里，让PVC变得非常臃肿，而且又把配置细节暴露给了开发者。</p>
+<h3 id="3-默认行为与简化-Defaulting-Simplification"><a href="#3-默认行为与简化-Defaulting-Simplification" class="headerlink" title="3. 默认行为与简化 (Defaulting &amp; Simplification)"></a>3. 默认行为与简化 (Defaulting &amp; Simplification)</h3><p>Kubernetes集群可以有一个<strong>默认的StorageClass</strong>。当用户创建一个没有指定 <code>storageClassName</code> 的PVC时，系统会自动使用这个默认的StorageClass。</p>
+<p>这极大地简化了最常见的使用场景。开发者甚至不需要知道StorageClass的存在，他们只需要写一个非常简单的PVC：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><code class="hljs yaml"><span class="hljs-comment"># 开发者完全不用关心storageClassName，系统会自动使用默认的StorageClass</span><br><span class="hljs-attr">kind:</span> <span class="hljs-string">PersistentVolumeClaim</span><br><span class="hljs-attr">apiVersion:</span> <span class="hljs-string">v1</span><br><span class="hljs-attr">metadata:</span><br>  <span class="hljs-attr">name:</span> <span class="hljs-string">simple-pvc</span><br><span class="hljs-attr">spec:</span><br>  <span class="hljs-attr">accessModes:</span><br>    <span class="hljs-bullet">-</span> <span class="hljs-string">ReadWriteOnce</span><br>  <span class="hljs-attr">resources:</span><br>    <span class="hljs-attr">requests:</span><br>      <span class="hljs-attr">storage:</span> <span class="hljs-string">5Gi</span><br><span class="hljs-comment"># 没有 storageClassName 字段！</span><br></code></pre></td></tr></table></figure>
+
+<p>如果没有StorageClass，实现这种“默认”行为会非常困难。</p>
+<h3 id="4-复用与多态-Reuse-Polymorphism"><a href="#4-复用与多态-Reuse-Polymorphism" class="headerlink" title="4. 复用与多态 (Reuse &amp; Polymorphism)"></a>4. 复用与多态 (Reuse &amp; Polymorphism)</h3><p>一个StorageClass可以被无数个PVC复用。管理员可以定义一个名为 <code>standard</code> 的StorageClass，全公司的成百上千个应用都可以通过引用 <code>storageClassName: standard</code> 来使用它。</p>
+<p>如果将来管理员想把 <code>standard</code> 存储的后端从AWS EBS迁移到Portworx，他只需要<strong>更新这一个StorageClass的定义</strong>，将所有PVC的Provisioner从 <code>kubernetes.io/aws-ebs</code> 改成 <code>portworx.io/shared</code>。<strong>所有引用这个StorageClass的PVC都无需任何修改</strong>。</p>
+<p>这是一种经典的“多态”设计：PVC（调用者）只依赖一个稳定的接口（StorageClass名称），而不依赖具体的实现（Provisioner）。具体的实现可以随时被更换，而调用者无感知。</p>
+<hr>
+<h3 id="总结：一个完美的比喻"><a href="#总结：一个完美的比喻" class="headerlink" title="总结：一个完美的比喻"></a>总结：一个完美的比喻</h3><p>让我们回到租房的比喻：</p>
+<ul>
+<li><strong>PVC</strong> &#x3D; <strong>你的需求清单</strong>（“我要一个2室1厅，月租5000以下的房子”）。</li>
+<li><strong>Provisioner</strong> &#x3D; <strong>某个具体的房产公司</strong>（比如“链家”），它有自己一套建&#x2F;租房的流程和内部参数。</li>
+<li><strong>StorageClass</strong> &#x3D; <strong>一个为你服务的“智能房产中介平台”</strong>（比如“贝壳”）。</li>
+</ul>
+<p>你为什么不能直接把需求清单（PVC）发给链家（Provisioner）呢？</p>
+<ol>
+<li><strong>解耦</strong>：你不想和某个具体公司绑死，你想的是“我要找房”，而不是“我必须用链家找房”。通过贝壳平台，你的需求也可以被我爱我家、麦田等其他公司看到。</li>
+<li><strong>参数化</strong>：贝壳平台让你可以轻松选择“整租”、“合租”、“是否需要车位”等标准化参数，而不需要你去了解链家内部的操作流程。</li>
+<li><strong>默认和简化</strong>：如果你没指定用哪个平台，系统可能会默认把你的需求发到最大的那个平台。</li>
+<li><strong>复用与多态</strong>：你记住了“贝壳”这个好用的平台接口。即使贝壳背后的合作公司从链家换成了万科，你依然可以用同样的方式（去贝壳平台）发布需求，完全不受影响。</li>
+</ol>
+<p>所以，<strong>StorageClass绝不是一个多余的“中间人”，而是一个强大的“抽象层”和“控制面”</strong>。它通过解耦、参数化和提供默认行为，使得存储配置既灵活又易于管理，完美体现了Kubernetes的设计智慧。</p>
+
+                
+              </div>
+            
+            <hr/>
+            <div>
+              <div class="post-metas my-3">
+  
+  
+</div>
+
+
+              
+  
+
+  <div class="license-box my-3">
+    <div class="license-title">
+      <div></div>
+      <div>http://guy-18.github.io/2025/08/22/PVC-StorageClass-PV原理解读/</div>
+    </div>
+    <div class="license-meta">
+      
+        <div class="license-meta-item">
+          <div>作者</div>
+          <div>John</div>
+        </div>
+      
+      
+        <div class="license-meta-item license-meta-date">
+          <div>发布于</div>
+          <div>2025年8月22日</div>
+        </div>
+      
+      
+      
+        <div class="license-meta-item">
+          <div>许可协议</div>
+          <div>
+            
+              
+              
+                <a class="print-no-link" target="_blank" href="https://creativecommons.org/licenses/by/4.0/">
+                  <span class="hint--top hint--rounded" aria-label="BY - 署名">
+                    <i class="iconfont icon-cc-by"></i>
+                  </span>
+                </a>
+              
+            
+          </div>
+        </div>
+      
+    </div>
+    <div class="license-icon iconfont"></div>
+  </div>
+
+
+
+              
+                <div class="post-prevnext my-3">
+                  <article class="post-prev col-6">
+                    
+                    
+                      <a href="/2025/08/24/volcano-allocate-action%E8%AF%A6%E8%A7%A3/" title="volcano-allocate-action详解">
+                        <i class="iconfont icon-arrowleft"></i>
+                        <span class="hidden-mobile">volcano-allocate-action详解</span>
+                        <span class="visible-mobile">上一篇</span>
+                      </a>
+                    
+                  </article>
+                  <article class="post-next col-6">
+                    
+                    
+                      <a href="/2025/08/20/k8s%E4%B8%ADwatch%E6%9C%BA%E5%88%B6%E5%AE%8C%E6%95%B4%E8%BF%87%E7%A8%8B%E8%A7%A3%E8%AF%BB/" title="k8s中watch机制完整过程解读">
+                        <span class="hidden-mobile">k8s中watch机制完整过程解读</span>
+                        <span class="visible-mobile">下一篇</span>
+                        <i class="iconfont icon-arrowright"></i>
+                      </a>
+                    
+                  </article>
+                </div>
+              
+            </div>
+
+            
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+  <aside class="sidebar" style="margin-left: -1rem">
+    <div id="toc">
+  <p class="toc-header">
+    <i class="iconfont icon-list"></i>
+    <span>目录</span>
+  </p>
+  <div class="toc-body" id="toc-body"></div>
+</div>
+
+
+
+  </aside>
+
+
+    </div>
+  </div>
+</div>
+
+
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+
+
+
+
+    
+
+    
+      <a id="scroll-top-button" aria-label="TOP" href="#" role="button">
+        <i class="iconfont icon-arrowup" aria-hidden="true"></i>
+      </a>
+    
+
+    
+      <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header text-center">
+        <h4 class="modal-title w-100 font-weight-bold">搜索</h4>
+        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body mx-3">
+        <div class="md-form mb-5">
+          <input type="text" id="local-search-input" class="form-control validate">
+          <label data-error="x" data-success="v" for="local-search-input">关键词</label>
+        </div>
+        <div class="list-group" id="local-search-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+    
+
+    
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+  
+    <div class="footer-content">
+       <a href="https://hexo.io" target="_blank" rel="nofollow noopener"><span>Hexo</span></a> <i class="iconfont icon-love"></i> <a href="https://github.com/fluid-dev/hexo-theme-fluid" target="_blank" rel="nofollow noopener"><span>Fluid</span></a> 
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+
+  <!-- Scripts -->
+  
+  <script  src="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.js" ></script>
+  <link  rel="stylesheet" href="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.css" />
+
+  <script>
+    NProgress.configure({"showSpinner":false,"trickleSpeed":100})
+    NProgress.start()
+    window.addEventListener('load', function() {
+      NProgress.done();
+    })
+  </script>
+
+
+<script  src="https://lib.baomitu.com/jquery/3.6.4/jquery.min.js" ></script>
+<script  src="https://lib.baomitu.com/twitter-bootstrap/4.6.1/js/bootstrap.min.js" ></script>
+<script  src="/js/events.js" ></script>
+<script  src="/js/plugins.js" ></script>
+
+
+  <script  src="https://lib.baomitu.com/typed.js/2.0.12/typed.min.js" ></script>
+  <script>
+    (function (window, document) {
+      var typing = Fluid.plugins.typing;
+      var subtitle = document.getElementById('subtitle');
+      if (!subtitle || !typing) {
+        return;
+      }
+      var text = subtitle.getAttribute('data-typed-text');
+      
+        typing(text);
+      
+    })(window, document);
+  </script>
+
+
+
+
+  
+    <script  src="/js/img-lazyload.js" ></script>
+  
+
+
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/tocbot/4.20.1/tocbot.min.js', function() {
+    var toc = jQuery('#toc');
+    if (toc.length === 0 || !window.tocbot) { return; }
+    var boardCtn = jQuery('#board-ctn');
+    var boardTop = boardCtn.offset().top;
+
+    window.tocbot.init(Object.assign({
+      tocSelector     : '#toc-body',
+      contentSelector : '.markdown-body',
+      linkClass       : 'tocbot-link',
+      activeLinkClass : 'tocbot-active-link',
+      listClass       : 'tocbot-list',
+      isCollapsedClass: 'tocbot-is-collapsed',
+      collapsibleClass: 'tocbot-is-collapsible',
+      scrollSmooth    : true,
+      includeTitleTags: true,
+      headingsOffset  : -boardTop,
+    }, CONFIG.toc));
+    if (toc.find('.toc-list-item').length > 0) {
+      toc.css('visibility', 'visible');
+    }
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('tocbot' in window) {
+        tocbot.refresh();
+        var toc = jQuery('#toc');
+        if (toc.length === 0 || !tocbot) {
+          return;
+        }
+        if (toc.find('.toc-list-item').length > 0) {
+          toc.css('visibility', 'visible');
+        }
+      }
+    });
+  });
+</script>
+
+
+  <script src=https://lib.baomitu.com/clipboard.js/2.0.11/clipboard.min.js></script>
+
+  <script>Fluid.plugins.codeWidget();</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/anchor-js/5.0.0/anchor.min.js', function() {
+    window.anchors.options = {
+      placement: CONFIG.anchorjs.placement,
+      visible  : CONFIG.anchorjs.visible
+    };
+    if (CONFIG.anchorjs.icon) {
+      window.anchors.options.icon = CONFIG.anchorjs.icon;
+    }
+    var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+    var res = [];
+    for (var item of el) {
+      res.push('.markdown-body > ' + item.trim());
+    }
+    if (CONFIG.anchorjs.placement === 'left') {
+      window.anchors.options.class = 'anchorjs-link-left';
+    }
+    window.anchors.add(res.join(', '));
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('anchors' in window) {
+        anchors.removeAll();
+        var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+        var res = [];
+        for (var item of el) {
+          res.push('.markdown-body > ' + item.trim());
+        }
+        if (CONFIG.anchorjs.placement === 'left') {
+          anchors.options.class = 'anchorjs-link-left';
+        }
+        anchors.add(res.join(', '));
+      }
+    });
+  });
+</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.js', function() {
+    Fluid.plugins.fancyBox();
+  });
+</script>
+
+
+  <script>Fluid.plugins.imageCaption();</script>
+
+  <script  src="/js/local-search.js" ></script>
+
+
+
+
+
+<!-- 主题的启动项，将它保持在最底部 -->
+<!-- the boot of the theme, keep it at the bottom -->
+<script  src="/js/boot.js" ></script>
+
+
+  
+
+  <noscript>
+    <div class="noscript-warning">博客在允许 JavaScript 运行的环境下浏览效果更佳</div>
+  </noscript>
+</body>
+</html>
