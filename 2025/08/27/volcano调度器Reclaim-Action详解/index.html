@@ -28,7 +28,7 @@
 <meta property="og:locale" content="zh_CN">
 <meta property="og:image" content="http://guy-18.github.io/2025/08/27/volcano%E8%B0%83%E5%BA%A6%E5%99%A8Reclaim-Action%E8%AF%A6%E8%A7%A3/deepseek_mermaid_20250826_b0c4a4.png">
 <meta property="article:published_time" content="2025-08-26T16:43:48.000Z">
-<meta property="article:modified_time" content="2025-08-26T16:49:32.709Z">
+<meta property="article:modified_time" content="2025-08-28T16:40:37.676Z">
 <meta property="article:author" content="John">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="http://guy-18.github.io/2025/08/27/volcano%E8%B0%83%E5%BA%A6%E5%99%A8Reclaim-Action%E8%AF%A6%E8%A7%A3/deepseek_mermaid_20250826_b0c4a4.png">
@@ -224,7 +224,7 @@
       <span class="post-meta mr-2">
         <i class="iconfont icon-chart"></i>
         
-          3.4k 字
+          4.9k 字
         
       </span>
     
@@ -235,7 +235,7 @@
         
         
         
-          28 分钟
+          41 分钟
         
       </span>
     
@@ -429,6 +429,130 @@
 <p><strong>对于绝大多数需要优先级和抢占功能的生产环境，社区给出的明确答案是：禁用 <code>enqueue</code> action。</strong></p>
 <p><strong>因此，您不应该在配置中同时使用 <code>enqueue</code> 和 <code>preempt</code> 而期望它们能协同工作。正确的做法是舍弃 <code>enqueue</code>，接受它所带来的控制面压力，以换取强大的调度能力。</strong> 这种压力通常可以通过升级控制平面硬件、优化 etcd 配置等方式来缓解。</p>
 <p>您的质疑非常到位，这确实是 Volcano 调度配置中最核心的一个决策点。感谢您的追问，让我有机会更清晰地解释这一点。</p>
+<h2 id="问题二：queue中的deserved（应得资源量）、capability（资源上限）和-guarantee（保障资源量）这几个参数分别是什么作用，是如何配合的"><a href="#问题二：queue中的deserved（应得资源量）、capability（资源上限）和-guarantee（保障资源量）这几个参数分别是什么作用，是如何配合的" class="headerlink" title="问题二：queue中的deserved（应得资源量）、capability（资源上限）和 guarantee（保障资源量）这几个参数分别是什么作用，是如何配合的"></a>问题二：queue中的deserved（应得资源量）、capability（资源上限）和 guarantee（保障资源量）这几个参数分别是什么作用，是如何配合的</h2><p>您提出的这个问题非常核心，是理解 Volcano 多租户资源管理模型的关键。<code>deserved</code>、<code>capability</code> 和 <code>guarantee</code> 这三个参数共同构成了一个既<strong>公平</strong>又<strong>具弹性</strong>且<strong>安全</strong>的资源分配体系。</p>
+<p>简单来说，它们回答了三个问题：</p>
+<ol>
+<li><strong>公平性 (Fairness)<strong>：在资源竞争时，每个队列</strong>应该</strong>分到多少？ -&gt; <code>deserved</code></li>
+<li><strong>隔离性 (Isolation)<strong>：每个队列最多</strong>允许</strong>使用多少？ -&gt; <code>capability</code></li>
+<li><strong>保障性 (Guarantee)<strong>：每个队列最少</strong>确保</strong>能得到多少？ -&gt; <code>guarantee</code></li>
+</ol>
+<p>下面我们进行详细的分解。</p>
+<h3 id="1-三个参数的角色与作用"><a href="#1-三个参数的角色与作用" class="headerlink" title="1. 三个参数的角色与作用"></a>1. 三个参数的角色与作用</h3><table>
+<thead>
+<tr>
+<th align="left">参数</th>
+<th align="left">英文名</th>
+<th align="left">核心作用</th>
+<th align="left">类比理解</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong><code>guarantee</code></strong></td>
+<td align="left">Guarantee</td>
+<td align="left"><strong>资源保障</strong>。队列<strong>绝对最小</strong>可使用的资源量，即使集群资源紧张，这部分资源也应由该队列独占或被回收回来。</td>
+<td align="left">你的<strong>基本工资</strong>。无论公司业绩多差，这笔钱必须发给你。</td>
+</tr>
+<tr>
+<td align="left"><strong><code>capability</code></strong></td>
+<td align="left">Capability</td>
+<td align="left"><strong>资源上限</strong>。队列<strong>绝对最大</strong>可使用的资源量，即使集群资源空闲，该队列也无法超过此限制。</td>
+<td align="left">你的<strong>年度薪资封顶</strong>。今年业绩再好，收入也不会超过这个数。</td>
+</tr>
+<tr>
+<td align="left"><strong><code>deserved</code></strong></td>
+<td align="left">Deserved</td>
+<td align="left"><strong>应得资源</strong>。队列<strong>按权重</strong>在当前集群条件下<strong>应得</strong>的资源量。这是一个<strong>动态计算</strong>的值，介于 <code>guarantee</code> 和 <code>capability</code> 之间。</td>
+<td align="left">你的<strong>绩效工资</strong>。根据你的贡献（权重）和公司当前利润（集群资源），今年<strong>应该</strong>发给你这么多。</td>
+</tr>
+</tbody></table>
+<h3 id="2-为什么需要这三个参数？"><a href="#2-为什么需要这三个参数？" class="headerlink" title="2. 为什么需要这三个参数？"></a>2. 为什么需要这三个参数？</h3><p>它们解决了多租户集群中的不同问题：</p>
+<ol>
+<li><p>**<code>guarantee</code>**：解决 <strong>“饿死” (Starvation)</strong> 问题。</p>
+<ul>
+<li><strong>场景</strong>：如果没有 <code>guarantee</code>，一个权重很低但运行着重要基础服务的队列，可能会被权重高的大作业完全挤占资源，导致服务不可用。</li>
+<li><strong>作用</strong>：它为重要队列提供了一个<strong>安全垫</strong>，确保了其业务的基线服务能力。</li>
+</ul>
+</li>
+<li><p>**<code>capability</code>**：解决 <strong>“贪婪” (Greediness)</strong> 问题。</p>
+<ul>
+<li><strong>场景</strong>：如果没有 <code>capability</code>，一个队列可能会无限占用所有集群资源，导致其他队列完全无法工作（例如，代码有 bug 提交了无限量的作业）。</li>
+<li><strong>作用</strong>：它为每个队列设置了<strong>资源边界</strong>，提供了资源隔离，是多租户安全的基石。</li>
+</ul>
+</li>
+<li><p>**<code>deserved</code>**：解决 <strong>“公平” (Fairness)</strong> 与 <strong>“弹性” (Elasticity)</strong> 问题。</p>
+<ul>
+<li><strong>场景</strong>：集群资源是波动的。<code>deserved</code> 根据每个队列的 <code>weight</code> 和集群当前<strong>可用资源总量</strong>，动态计算出一个公平的分配额。</li>
+<li><strong>作用</strong>：它使得资源分配不是僵化的，而是在保障基本盘 (<code>guarantee</code>) 的前提下，允许队列<strong>弹性地</strong>共享集群的空闲资源，从而最大限度地提高整体资源利用率。</li>
+</ul>
+</li>
+</ol>
+<h3 id="3-它们是如何协同工作的？（核心）"><a href="#3-它们是如何协同工作的？（核心）" class="headerlink" title="3. 它们是如何协同工作的？（核心）"></a>3. 它们是如何协同工作的？（核心）</h3><p><strong>计算过程与交互</strong>：</p>
+<ol>
+<li><p>**计算 <code>deserved</code>**：</p>
+<ul>
+<li><code>deserved</code> 不是静态配置的，而是由 <strong>Proportion 插件</strong>动态计算出来的。</li>
+<li>计算公式可以简化为：<code>queue&#39;s deserved = (queue&#39;s weight / total weight of all queues) * (available idle resources) + queue&#39;s guarantee</code></li>
+<li>但它最终会被钳制在 <code>[guarantee, capability]</code> 区间内。计算出的 <code>deserved</code> 值永远不能小于 <code>guarantee</code>，也不能大于 <code>capability</code>。</li>
+</ul>
+</li>
+<li><p><strong>驱动 <code>Reclaim</code> Action</strong>：</p>
+<ul>
+<li><strong>回收目标</strong>：<code>Reclaim</code> Action 会持续检查所有队列。如果一个队列的<strong>当前已使用资源 (<code>allocated</code>)</strong> <strong>大于</strong>其 <code>deserved</code>，并且它的 <code>reclaimable=true</code>，那么它就成为资源回收的<strong>目标</strong>（受害者）。</li>
+<li><strong>回收来源</strong>：同时，如果一个队列的 <code>allocated</code> <strong>小于</strong>其 <code>deserved</code>，说明它应该得到更多资源，它就成为资源回收的<strong>发起方</strong>。</li>
+<li><strong>回收目标值</strong>：<code>Reclaim</code> 的目标是将队列的资源使用量调整到其 <code>deserved</code> 的水平。</li>
+</ul>
+</li>
+</ol>
+<h3 id="4-一个具体的例子"><a href="#4-一个具体的例子" class="headerlink" title="4. 一个具体的例子"></a>4. 一个具体的例子</h3><p>假设一个集群有 <strong>100核 CPU</strong>。<br>有两个队列：</p>
+<ul>
+<li><strong>Queue-online</strong>:<ul>
+<li><code>weight: 2</code></li>
+<li><code>guarantee: 30</code></li>
+<li><code>capability: 70</code></li>
+</ul>
+</li>
+<li><strong>Queue-offline</strong>:<ul>
+<li><code>weight: 1</code></li>
+<li><code>guarantee: 10</code></li>
+<li><code>capability: 50</code></li>
+</ul>
+</li>
+</ul>
+<p><strong>场景 1：集群空闲时（两个队列都已使用各自 <code>guarantee</code> 的资源）</strong></p>
+<ul>
+<li>空闲资源 &#x3D; 100 - 30 - 10 &#x3D; 60核。</li>
+<li>计算 <code>deserved</code>：<ul>
+<li><code>Queue-online.deserved</code> &#x3D; 30 + (2&#x2F;3) * 60 &#x3D; 30 + 40 &#x3D; <strong>70核</strong> (达到capability上限)</li>
+<li><code>Queue-offline.deserved</code> &#x3D; 10 + (1&#x2F;3) * 60 &#x3D; 10 + 20 &#x3D; <strong>30核</strong> (在10-50之间)</li>
+</ul>
+</li>
+<li><strong>结果</strong>：<code>Queue-online</code> 最多可用到70核，<code>Queue-offline</code> 最多可用到30核。<code>Reclaim</code> 不会触发，因为双方都用不到自己的 <code>deserved</code>。</li>
+</ul>
+<p><strong>场景 2：集群繁忙时（<code>Queue-offline</code> 已用了50核，超过了其 <code>deserved</code>）</strong></p>
+<ul>
+<li>假设 <code>Queue-offline</code> 当前用了50核（达到了它的 <code>capability</code>）。</li>
+<li>而 <code>Queue-online</code> 只用了40核（低于它的 <code>deserved</code> 70核）。</li>
+<li><strong><code>Reclaim</code> Action 触发</strong>：<ul>
+<li><code>Queue-offline</code> (allocated&#x3D;50) &gt; <code>Queue-offline.deserved</code> (~30) -&gt; <strong>受害者</strong></li>
+<li><code>Queue-online</code> (allocated&#x3D;40) &lt; <code>Queue-online.deserved</code> (70) -&gt; <strong>发起方</strong></li>
+</ul>
+</li>
+<li><strong><code>Reclaim</code> 执行</strong>：从 <code>Queue-offline</code> 中回收资源，直到它的使用量接近其 <code>deserved</code> 的30核。</li>
+</ul>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><ul>
+<li><strong><code>guarantee</code><strong>：是</strong>底线</strong>，确保重要队列不被“饿死”，是防御性的。</li>
+<li><strong><code>capability</code><strong>：是</strong>天花板</strong>，防止单个队列“吃撑”，是隔离性的。</li>
+<li><strong><code>deserved</code><strong>：是</strong>目标线</strong>，在底线和天花板之间动态调整，追求<strong>公平</strong>和<strong>弹性</strong>，是调度器（特别是 <code>Reclaim</code> Action）操作的<strong>核心依据</strong>。</li>
+</ul>
+<p>这三个参数共同作用，使得 Volcano 能够实现一个真正生产级可用的、兼顾公平、效率与安全的多租户资源管理模型。</p>
+<h3 id="💎-总结"><a href="#💎-总结" class="headerlink" title="💎 总结"></a>💎 总结</h3><p>所以，回答你的问题：<strong>即使两个队列总和未超100核，且 <code>queue-online</code> 暂时无额外需求，<code>reclaim</code> 机制仍可能主动触发。</strong></p>
+<p>这并非多此一举，而是为了：</p>
+<ol>
+<li><strong>即刻的公平性</strong>：确保每个队列的资源使用量符合其 <code>deserved</code> 份额设定的公平原则。</li>
+<li><strong>规则的强制性</strong>：维护资源分配规则的权威性，确保资源配额不是“软约束”。</li>
+<li><strong>未来的灵活性</strong>：为其他队列可能随时出现的资源需求做好准备，保持集群资源的弹性和流动性。</li>
+</ol>
+<p>可以说，<code>reclaim</code> 是一种积极的、预防性的调度手段，而不仅仅是被动的应急反应。它致力于在问题发生前就维持一个清晰、公平且高效的资源状态。</p>
 
                 
               </div>
@@ -490,6 +614,12 @@
                 <div class="post-prevnext my-3">
                   <article class="post-prev col-6">
                     
+                    
+                      <a href="/2025/09/11/k8s%E4%B8%ADapiserver%E5%AF%B9%E5%B9%B6%E5%8F%91%E6%93%8D%E4%BD%9C%E7%9A%84%E6%8E%A7%E5%88%B6/" title="k8s中apiserver对并发操作的控制">
+                        <i class="iconfont icon-arrowleft"></i>
+                        <span class="hidden-mobile">k8s中apiserver对并发操作的控制</span>
+                        <span class="visible-mobile">上一篇</span>
+                      </a>
                     
                   </article>
                   <article class="post-next col-6">
