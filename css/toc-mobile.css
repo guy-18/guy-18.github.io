@@ -1,0 +1,69 @@
+/* 移动端 TOC 抽屉 — Fluid 主题补丁
+ * 让文章目录在手机端 (<992px) 通过右下角浮动按钮呼出
+ */
+@media (max-width: 991.98px) {
+  .side-col.toc-drawer-col {
+    display: block !important;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 78vw;
+    max-width: 320px;
+    z-index: 1100;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 3.5rem 1rem 1rem;
+    margin: 0;
+    background: var(--board-bg-color, #fff);
+    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.18);
+    transform: translateX(110%);
+    transition: transform 0.25s ease;
+  }
+  body.toc-open .side-col.toc-drawer-col {
+    transform: translateX(0);
+  }
+  #toc-fab {
+    position: fixed;
+    right: 14px;
+    bottom: 90px; /* 避开 Fluid 的 TOP 回顶按钮 */
+    z-index: 1080;
+    width: 44px;
+    height: 44px;
+    border: none;
+    border-radius: 50%;
+    background: var(--navbar-bg-color, #2f4154);
+    color: #fff;
+    font-size: 20px;
+    line-height: 44px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+  }
+  .toc-mask {
+    position: fixed;
+    inset: 0;
+    z-index: 1090;
+    background: rgba(0, 0, 0, 0.45);
+    display: none;
+  }
+  body.toc-open .toc-mask {
+    display: block;
+  }
+  /* 覆盖 Fluid 桌面端的单行截断样式，抽屉里允许换行 */
+  .toc-drawer-col .toc-list-item {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    word-break: break-word;
+  }
+  .toc-drawer-col .toc-body {
+    max-height: none;
+  }
+}
+@media (min-width: 992px) {
+  #toc-fab,
+  .toc-mask {
+    display: none !important;
+  }
+}
